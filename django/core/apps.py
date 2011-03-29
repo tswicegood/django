@@ -22,6 +22,9 @@ class App(object):
         - has a models.py file that with class(es) subclassing ModelBase
     """
     def __init__(self, name):
+        # name = 'django.contrib.auth' -- 'django.contrib.auth.AuthApp'
+        # module_path = ''
+        # module_name = 'auth'
         self.name = name
         self.verbose_name = _(name.title())
         self.db_prefix = name
@@ -44,7 +47,7 @@ class AppCache(object):
     # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66531.
     __shared_state = dict(
         # List of App instances
-        app_instances = [],
+        installed_apps = [],
 
         # Mapping of app_labels to a dictionary of model names to model code.
         unbound_models = {},
@@ -102,8 +105,8 @@ class AppCache(object):
                         app_instance.models.append(model)
                 # check if there is more than one app with the same
                 # db_prefix attribute
-                for app in self.app_instances:
-                    for app_cmp in self.app_instances:
+                for app in self.installed_apps:
+                    for app_cmp in self.installed_apps:
                         if app != app_cmp and \
                                 app.db_prefix == app_cmp.db_prefix:
                             raise ImproperlyConfigured(
@@ -136,7 +139,7 @@ class AppCache(object):
             app_instance = app_class(app_instance_name)
             app_instance.module = app_module
             app_instance.path = app_name
-            self.app_instances.append(app_instance)
+            self.installed_apps.append(app_instance)
 
         # Check if the app instance specifies a path to a models module
         # if not, we use the models.py file from the package dir
@@ -175,7 +178,7 @@ class AppCache(object):
         """
         #if '.' in name:
         #    name = name.rsplit('.', 1)[1]
-        for app in self.app_instances:
+        for app in self.installed_apps:
             if app.name == name:
                 return app
 
@@ -191,7 +194,7 @@ class AppCache(object):
     def get_apps(self):
         "Returns a list of all models modules."
         self._populate()
-        return [app.models_module for app in self.app_instances\
+        return [app.models_module for app in self.installed_apps\
                 if hasattr(app, 'models_module')]
 
     def get_app(self, app_label, emptyOK=False):
@@ -202,7 +205,7 @@ class AppCache(object):
         self._populate()
         self.write_lock.acquire()
         try:
-            for app in self.app_instances:
+            for app in self.installed_apps:
                 if app_label == app.name:
                     mod = self.load_app(app.path, False)
                     if mod is None:
@@ -218,7 +221,7 @@ class AppCache(object):
         "Returns the map of known problems with the INSTALLED_APPS."
         self._populate()
         errors = {}
-        for app in self.app_instances:
+        for app in self.installed_apps:
             if app.errors:
                 errors.update({app.label: app.errors})
         return errors
@@ -248,7 +251,7 @@ class AppCache(object):
             if app:
                 app_list = [app]
         else:
-            app_list = self.app_instances
+            app_list = self.installed_apps
         model_list = []
         for app in app_list:
             models = app.models
