@@ -19,7 +19,7 @@ class Command(NoArgsCommand):
             default=DEFAULT_DB_ALIAS, help='Nominates a database to synchronize. '
                 'Defaults to the "default" database.'),
     )
-    help = "Create the database tables for all apps in INSTALLED_APPS whose tables haven't already been created."
+    help = "Create the database tables for all installed apps whose tables haven't already been created."
 
     def handle_noargs(self, **options):
 
@@ -31,9 +31,9 @@ class Command(NoArgsCommand):
 
         # Import the 'management' module within each installed app, to register
         # dispatcher events.
-        for app_name in cache.installed_apps:
+        for app in cache.app_instances:
             try:
-                import_module('.management', app_name)
+                import_module('.management', app.path)
             except ImportError, exc:
                 # This is slightly hackish. We want to ignore ImportErrors
                 # if the "management" module itself is missing -- but we don't

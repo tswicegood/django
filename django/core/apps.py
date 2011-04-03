@@ -17,16 +17,22 @@ class MultipleInstancesReturned(Exception):
 
 class App(object):
     """
-    An App in Django is a python package that:
-        - is listen in the INSTALLED_APPS setting
-        - has a models.py file that with class(es) subclassing ModelBase
+    Base App class.
     """
-    def __init__(self, name):
-        self.name = name
-        self.verbose_name = _(name.title())
-        self.db_prefix = name
+    def __init__(self, path):
+        self.path = path
+
+        # get the name from the path e.g. "auth" for "django.contrib.auth"
+        if '.' in path:
+            self.name = path.rsplit('.', 1)[1]
+        else:
+            self.name = path
+
+        self.verbose_name = _(self.name.title())
+        self.db_prefix = self.name
         self.errors = []
         self.models = []
+        self.models_path = '%s.models' % self.path
         self.module = None
 
     def __str__(self):
@@ -43,7 +49,7 @@ class AppCache(object):
     # Use the Borg pattern to share state between all instances. Details at
     # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66531.
     __shared_state = dict(
-        # List of App instances
+        # list of loaded app instances
         app_instances = [],
 
         # Mapping of app_labels to a dictionary of model names to model code.
@@ -73,6 +79,8 @@ class AppCache(object):
         try:
             if self.loaded:
                 return
+
+            # load apps listed in APP_CLASSES
             for app_name in settings.APP_CLASSES:
                 if app_name in self.handled:
                     continue
@@ -81,6 +89,8 @@ class AppCache(object):
                 app_class = getattr(app_module, app_classname)
                 app_name = app_name.rsplit('.', 2)[0]
                 self.load_app(app_name, True, app_class)
+
+            # load apps listed in INSTALLED_APPS
             for app_name in settings.INSTALLED_APPS:
                 if app_name in self.handled:
                     continue
@@ -119,32 +129,29 @@ class AppCache(object):
         """
         Loads the app with the provided fully qualified name, and returns the
         model module.
+
+        Keyword Arguments:
+            app_name: fully qualified name (e.g. 'django.contrib.auth')
+            can_postpone: If set to True and the import raises an ImportError
+                the loading will be postponed and tried again when all other
+                modules are loaded.
+            app_class: The app class of which an instance should be created.
         """
         self.handled[app_name] = None
         self.nesting_level += 1
 
         app_module = import_module(app_name)
 
-        # check if an app instance with that name already exists
+        # check if an app instance with app_name already exists, if not
+        # then create one
         app_instance = self.find_app(app_name)
         if not app_instance:
-            if '.' in app_name:
-                # get the app label from the full path
-                app_instance_name = app_name.rsplit('.', 1)[1]
-            else:
-                app_instance_name = app_name
-            app_instance = app_class(app_instance_name)
+            app_instance = app_class(app_name)
             app_instance.module = app_module
-            app_instance.path = app_name
             self.app_instances.append(app_instance)
 
-        # Check if the app instance specifies a path to a models module
-        # if not, we use the models.py file from the package dir
-        models_path = getattr(app_instance, 'models_path',
-                '%s.models' % app_name)
-
         try:
-            models = import_module(models_path)
+            models = import_module(app_instance.models_path)
         except ImportError:
             self.nesting_level -= 1
             # If the app doesn't have a models module, we can just ignore the
@@ -173,8 +180,6 @@ class AppCache(object):
         """
         Returns the app instance that matches name
         """
-        #if '.' in name:
-        #    name = name.rsplit('.', 1)[1]
         for app in self.app_instances:
             if app.name == name:
                 return app

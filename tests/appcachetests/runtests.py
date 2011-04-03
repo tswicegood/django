@@ -2,6 +2,7 @@ import copy
 import sys
 import unittest
 import threading
+
 from django.conf import settings
 from django.utils.datastructures import SortedDict
 from django.core.exceptions import ImproperlyConfigured
@@ -51,7 +52,6 @@ class AppCacheTestCase(unittest.TestCase):
         # because thread.RLock is un(deep)copyable
         cache.unbound_models = {}
         cache.app_instances = []
-        cache.installed_apps = []
 
         cache.loaded = False
         cache.handled = {}
@@ -103,6 +103,17 @@ class GetAppsTests(AppCacheTestCase):
         apps = cache.get_apps()
         self.assertTrue(cache.app_cache_ready())
         self.assertEquals(apps[0].__name__, 'model_app.models')
+
+    def test_same_app_in_both_settings(self):
+        """
+        Test that if an App is listed in both settings (INSTALLED_APPS and
+        APP_CLASSES), only one of them (the one in APP_CLASSES) is loaded
+        """
+        settings.APP_CLASSES = ('model_app.apps.MyApp',)
+        settings.INSTALLED_APPS = ('model_app',)
+        apps = cache.get_apps()
+        self.assertEquals(len(apps), 1)
+        self.assertEquals(apps[0].__name__, 'model_app.othermodels')        
 
     def test_empty_models(self):
         """
@@ -371,4 +382,3 @@ class FindAppTests(AppCacheTestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

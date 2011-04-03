@@ -98,7 +98,7 @@ def get_commands():
         # Find the installed apps
         try:
             from django.core.apps import cache
-            apps = cache.installed_apps
+            apps = cache.app_instances
         except (AttributeError, EnvironmentError, ImportError):
             apps = []
 
@@ -111,10 +111,10 @@ def get_commands():
             project_directory = None
 
         # Find and load the management module for each installed app.
-        for app_name in apps:
+        for app in apps:
             try:
-                path = find_management_module(app_name)
-                _commands.update(dict([(name, app_name)
+                path = find_management_module(app.path)
+                _commands.update(dict([(name, app.path)
                                        for name in find_commands(path)]))
             except ImportError:
                 pass # No management module - ignore this app
