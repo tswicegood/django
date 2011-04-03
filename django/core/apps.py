@@ -19,12 +19,20 @@ class App(object):
     """
     Base App class.
     """
-    def __init__(self, name):
-        self.name = name
-        self.verbose_name = _(name.title())
-        self.db_prefix = name
+    def __init__(self, path):
+        self.path = path
+
+        # get the name from the path e.g. "auth" for "django.contrib.auth"
+        if '.' in path:
+            self.name = path.rsplit('.', 1)[1]
+        else:
+            self.name = path
+
+        self.verbose_name = _(self.name.title())
+        self.db_prefix = self.name
         self.errors = []
         self.models = []
+        self.models_path = '%s.models' % self.path
         self.module = None
 
     def __str__(self):
@@ -138,23 +146,12 @@ class AppCache(object):
         # then create one
         app_instance = self.find_app(app_name)
         if not app_instance:
-            if '.' in app_name:
-                # get the app label from the full path
-                app_instance_name = app_name.rsplit('.', 1)[1]
-            else:
-                app_instance_name = app_name
-            app_instance = app_class(app_instance_name)
+            app_instance = app_class(app_name)
             app_instance.module = app_module
-            app_instance.path = app_name
             self.app_instances.append(app_instance)
 
-        # Check if the app instance specifies a path to a models module
-        # if not, we use the models.py file from the package dir
-        models_path = getattr(app_instance, 'models_path',
-                '%s.models' % app_name)
-
         try:
-            models = import_module(models_path)
+            models = import_module(app_instance.models_path)
         except ImportError:
             self.nesting_level -= 1
             # If the app doesn't have a models module, we can just ignore the

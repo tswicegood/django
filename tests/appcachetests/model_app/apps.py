@@ -1,7 +1,9 @@
 from django.core.apps import App
 
 class MyApp(App):
-    models_path = 'model_app.othermodels'
+    def __init__(self, path):
+        super(MyApp, self).__init__(path)
+        self.models_path = 'model_app.othermodels'
 
 class MyOtherApp(MyApp):
     def __init__(self, name):
