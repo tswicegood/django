@@ -104,6 +104,17 @@ class GetAppsTests(AppCacheTestCase):
         self.assertTrue(cache.app_cache_ready())
         self.assertEquals(apps[0].__name__, 'model_app.models')
 
+    def test_same_app_in_both_settings(self):
+        """
+        Test that if an App is listed in both settings (INSTALLED_APPS and
+        APP_CLASSES), only one of them (the one in APP_CLASSES) is loaded
+        """
+        settings.APP_CLASSES = ('model_app.apps.MyApp',)
+        settings.INSTALLED_APPS = ('model_app',)
+        apps = cache.get_apps()
+        self.assertEquals(len(apps), 1)
+        self.assertEquals(apps[0].__name__, 'model_app.othermodels')        
+
     def test_empty_models(self):
         """
         Test that modules that don't contain models are not returned
