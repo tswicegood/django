@@ -17,14 +17,9 @@ class MultipleInstancesReturned(Exception):
 
 class App(object):
     """
-    An App in Django is a python package that:
-        - is listen in the INSTALLED_APPS setting
-        - has a models.py file that with class(es) subclassing ModelBase
+    Base App class.
     """
     def __init__(self, name):
-        # name = 'django.contrib.auth' -- 'django.contrib.auth.AuthApp'
-        # module_path = ''
-        # module_name = 'auth'
         self.name = name
         self.verbose_name = _(name.title())
         self.db_prefix = name
@@ -46,8 +41,8 @@ class AppCache(object):
     # Use the Borg pattern to share state between all instances. Details at
     # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66531.
     __shared_state = dict(
-        # List of App instances
-        installed_apps = [],
+        # list of loaded app instances
+        app_instances = [],
 
         # Mapping of app_labels to a dictionary of model names to model code.
         unbound_models = {},
@@ -76,6 +71,8 @@ class AppCache(object):
         try:
             if self.loaded:
                 return
+
+            # load apps listed in APP_CLASSES
             for app_name in settings.APP_CLASSES:
                 if app_name in self.handled:
                     continue
@@ -84,6 +81,8 @@ class AppCache(object):
                 app_class = getattr(app_module, app_classname)
                 app_name = app_name.rsplit('.', 2)[0]
                 self.load_app(app_name, True, app_class)
+
+            # load apps listed in INSTALLED_APPS
             for app_name in settings.INSTALLED_APPS:
                 if app_name in self.handled:
                     continue
@@ -105,8 +104,8 @@ class AppCache(object):
                         app_instance.models.append(model)
                 # check if there is more than one app with the same
                 # db_prefix attribute
-                for app in self.installed_apps:
-                    for app_cmp in self.installed_apps:
+                for app in self.app_instances:
+                    for app_cmp in self.app_instances:
                         if app != app_cmp and \
                                 app.db_prefix == app_cmp.db_prefix:
                             raise ImproperlyConfigured(
@@ -122,13 +121,21 @@ class AppCache(object):
         """
         Loads the app with the provided fully qualified name, and returns the
         model module.
+
+        Keyword Arguments:
+            app_name: fully qualified name (e.g. 'django.contrib.auth')
+            can_postpone: If set to True and the import raises an ImportError
+                the loading will be postponed and tried again when all other
+                modules are loaded.
+            app_class: The app class of which an instance should be created.
         """
         self.handled[app_name] = None
         self.nesting_level += 1
 
         app_module = import_module(app_name)
 
-        # check if an app instance with that name already exists
+        # check if an app instance with app_name already exists, if not
+        # then create one
         app_instance = self.find_app(app_name)
         if not app_instance:
             if '.' in app_name:
@@ -139,7 +146,7 @@ class AppCache(object):
             app_instance = app_class(app_instance_name)
             app_instance.module = app_module
             app_instance.path = app_name
-            self.installed_apps.append(app_instance)
+            self.app_instances.append(app_instance)
 
         # Check if the app instance specifies a path to a models module
         # if not, we use the models.py file from the package dir
@@ -176,9 +183,7 @@ class AppCache(object):
         """
         Returns the app instance that matches name
         """
-        #if '.' in name:
-        #    name = name.rsplit('.', 1)[1]
-        for app in self.installed_apps:
+        for app in self.app_instances:
             if app.name == name:
                 return app
 
@@ -194,7 +199,7 @@ class AppCache(object):
     def get_apps(self):
         "Returns a list of all models modules."
         self._populate()
-        return [app.models_module for app in self.installed_apps\
+        return [app.models_module for app in self.app_instances\
                 if hasattr(app, 'models_module')]
 
     def get_app(self, app_label, emptyOK=False):
@@ -205,7 +210,7 @@ class AppCache(object):
         self._populate()
         self.write_lock.acquire()
         try:
-            for app in self.installed_apps:
+            for app in self.app_instances:
                 if app_label == app.name:
                     mod = self.load_app(app.path, False)
                     if mod is None:
@@ -221,7 +226,7 @@ class AppCache(object):
         "Returns the map of known problems with the INSTALLED_APPS."
         self._populate()
         errors = {}
-        for app in self.installed_apps:
+        for app in self.app_instances:
             if app.errors:
                 errors.update({app.label: app.errors})
         return errors
@@ -251,7 +256,7 @@ class AppCache(object):
             if app:
                 app_list = [app]
         else:
-            app_list = self.installed_apps
+            app_list = self.app_instances
         model_list = []
         for app in app_list:
             models = app.models
