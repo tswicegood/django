@@ -17,9 +17,8 @@ from django.utils.importlib import import_module
 # At compile time, cache the directories to search.
 fs_encoding = sys.getfilesystemencoding() or sys.getdefaultencoding()
 app_template_dirs = []
-for app in cache.installed_apps:
-    app_instance = cache.find_app(app)
-    mod = app_instance.module
+for app in cache.app_instances:
+    mod = app.module
     template_dir = os.path.join(os.path.dirname(mod.__file__), 'templates')
     if os.path.isdir(template_dir):
         app_template_dirs.append(template_dir.decode(fs_encoding))
