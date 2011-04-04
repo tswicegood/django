@@ -16,13 +16,12 @@ def autodiscover():
     from django.utils.importlib import import_module
     from django.utils.module_loading import module_has_submodule
 
-    for app in cache.installed_apps:
-        app_instance = cache.find_app(app)
-        mod = app_instance.module
+    for app in cache.app_instances:
+        mod = app.module
         # Attempt to import the app's admin module.
         try:
             before_import_registry = copy.copy(site._registry)
-            import_module('%s.admin' % app)
+            import_module('%s.admin' % app.path)
         except:
             # Reset the model registry to the state before the last import as
             # this import will have to reoccur on the next request and this
