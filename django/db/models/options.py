@@ -105,7 +105,7 @@ class Options(object):
                 # model is imported
                 self.db_table = "%s_%s" % (self.app_label, self.module_name)
             else:
-                self.db_table = "%s_%s" % (app_instance.db_prefix, self.module_name)
+                self.db_table = "%s_%s" % (app_instance._meta.db_prefix, self.module_name)
             self.db_table = truncate_name(self.db_table, connection.ops.max_name_length())
 
     def _prepare(self, model):

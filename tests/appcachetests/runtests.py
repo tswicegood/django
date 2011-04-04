@@ -6,7 +6,7 @@ import threading
 from django.conf import settings
 from django.utils.datastructures import SortedDict
 from django.core.exceptions import ImproperlyConfigured
-from django.core.apps import cache, MultipleInstancesReturned
+from django.core.apps import cache
 
 # remove when tests are integrated into the django testsuite
 settings.configure()
@@ -43,7 +43,7 @@ class AppCacheTestCase(unittest.TestCase):
                     del sys.modules[module]
 
         for app in cache.app_instances:
-            for model in app.models:
+            for model in app._meta.models:
                 module = model.__module__
                 if module in sys.modules:
                     del sys.modules[module]
@@ -128,7 +128,7 @@ class GetAppsTests(AppCacheTestCase):
         Test that an exception is raised if two app instances
         have the same db_prefix attribute
         """
-        settings.APP_CLASSES = ('nomodel_app.apps.MyApp',
+        settings.APP_CLASSES = ('nomodel_app.app.MyApp',
                                 'model_app.apps.MyOtherApp',)
         self.assertRaises(ImproperlyConfigured, cache.get_apps)
 
@@ -274,8 +274,8 @@ class LoadAppTests(AppCacheTestCase):
         rv = cache.load_app('model_app')
         app = cache.app_instances[0]
         self.assertEqual(len(cache.app_instances), 1)
-        self.assertEqual(app.name, 'model_app')
-        self.assertEqual(app.models_module.__name__, 'model_app.models')
+        self.assertEqual(app._meta.name, 'model_app')
+        self.assertEqual(app._meta.models_module.__name__, 'model_app.models')
         self.assertEqual(rv.__name__, 'model_app.models')
 
     def test_with_custom_models(self):
@@ -283,12 +283,12 @@ class LoadAppTests(AppCacheTestCase):
         Test that custom models are imported correctly, if the App specifies
         an models_path attribute
         """
-        from nomodel_app.apps import MyApp
+        from model_app.apps import MyApp
         rv = cache.load_app('model_app', can_postpone=False, app_class=MyApp)
         app = cache.app_instances[0]
-        self.assertEqual(app.models_module.__name__, 'model_app.models')
+        self.assertEqual(app._meta.models_module.__name__, 'model_app.othermodels')
         self.assertTrue(isinstance(app, MyApp))
-        self.assertEqual(rv.__name__, 'model_app.models')
+        self.assertEqual(rv.__name__, 'model_app.othermodels')
 
     def test_without_models(self):
         """
@@ -298,7 +298,7 @@ class LoadAppTests(AppCacheTestCase):
         rv = cache.load_app('nomodel_app')
         app = cache.app_instances[0]
         self.assertEqual(len(cache.app_instances), 1)
-        self.assertEqual(app.name, 'nomodel_app')
+        self.assertEqual(app._meta.name, 'nomodel_app')
         self.assertEqual(rv, None)
 
     def test_loading_the_same_app_twice(self):
@@ -330,7 +330,7 @@ class RegisterModelsTests(AppCacheTestCase):
         settings.INSTALLED_APPS = ('model_app',)
         cache.get_app_errors()
         self.assertTrue(cache.app_cache_ready())
-        app_models = cache.app_instances[0].models
+        app_models = cache.app_instances[0]._meta.models
         self.assertEqual(len(app_models), 1)
         self.assertEqual(app_models[0].__name__, 'Person')
 
@@ -366,7 +366,7 @@ class FindAppTests(AppCacheTestCase):
         cache.get_app_errors()
         self.assertTrue(cache.app_cache_ready())
         rv = cache.find_app('model_app')
-        self.assertEquals(rv.name, 'model_app')
+        self.assertEquals(rv._meta.name, 'model_app')
         self.assertTrue(isinstance(rv, App))
 
     def test_unseeded(self):
@@ -377,7 +377,7 @@ class FindAppTests(AppCacheTestCase):
         cache.load_app('model_app')
         self.assertFalse(cache.app_cache_ready())
         rv = cache.find_app('model_app')
-        self.assertEquals(rv.name, 'model_app')
+        self.assertEquals(rv._meta.name, 'model_app')
         self.assertTrue(isinstance(rv, App))
 
 if __name__ == '__main__':

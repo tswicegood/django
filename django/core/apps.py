@@ -1,45 +1,115 @@
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
-from django.utils.datastructures import SortedDict
-from django.utils.importlib import import_module
-from django.utils.module_loading import module_has_submodule
-from django.utils.translation import ugettext as _
-
-import imp
+import re
 import sys
 import os
 import threading
 
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
+from django.dispatch import Signal
+from django.utils.datastructures import SortedDict
+from django.utils.importlib import import_module
+from django.utils.module_loading import module_has_submodule
 
-class MultipleInstancesReturned(Exception):
-    "The function returned multiple App instances with the same label"
-    pass
+def get_verbose_name(class_name):
+    new = re.sub('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))', ' \\1', class_name)
+    return new.lower().strip()
+
+def get_class_name(module_name):
+    new = re.sub(r'_([a-z])', lambda m: (m.group(1).upper()), module_name)
+    return new[0].upper() + new[1:]
+
+DEFAULT_NAMES = ('verbose_name', 'db_prefix', 'models_path')
+
+app_prepared = Signal(providing_args=["app"])
+
+class AppOptions(object):
+    def __init__(self, name, meta):
+        self.name = name
+        self.meta = meta
+        self.errors = []
+        self.models = []
+
+    def contribute_to_class(self, cls, name):
+        cls._meta = self
+        # get the name from the path e.g. "auth" for "django.contrib.auth"
+        self.label = self.name.split('.')[-1]
+        self.db_prefix = self.label
+        self.module = import_module(self.name)
+        self.models_path = '%s.models' % self.name
+        self.verbose_name = get_verbose_name(self.label)
+
+        # Next, apply any overridden values from 'class Meta'.
+        if self.meta:
+            meta_attrs = self.meta.__dict__.copy()
+            for name in self.meta.__dict__:
+                # Ignore any private attributes that Django doesn't care about.
+                if name.startswith('_'):
+                    del meta_attrs[name]
+            for attr_name in DEFAULT_NAMES:
+                if attr_name in meta_attrs:
+                    setattr(self, attr_name, meta_attrs.pop(attr_name))
+                elif hasattr(self.meta, attr_name):
+                    setattr(self, attr_name, getattr(self.meta, attr_name))
+
+            # Any leftover attributes must be invalid.
+            if meta_attrs != {}:
+                raise TypeError("'class Meta' got invalid attribute(s): %s"
+                                % ','.join(meta_attrs.keys()))
+        del self.meta
+
+
+class AppBase(type):
+    """
+    Metaclass for all apps.
+    """
+    def __new__(cls, name, bases, attrs):
+        super_new = super(AppBase, cls).__new__
+        parents = [b for b in bases if isinstance(b, AppBase)]
+        if not parents:
+            # If this isn't a subclass of App, don't do anything special.
+            return super_new(cls, name, bases, attrs)
+        module = attrs.pop('__module__', cls.__module__)
+        new_class = super_new(cls, name, bases, {'__module__': module})
+        attr_meta = attrs.pop('Meta', None)
+        if not attr_meta:
+            meta = getattr(new_class, 'Meta', None)
+        else:
+            meta = attr_meta
+        app_name = attrs.pop('_name', None)
+        if app_name is None:
+            # Figure out the app_name by looking one level up.
+            # For 'django.contrib.sites.app', this would be 'django.contrib.sites'
+            app_module = sys.modules[new_class.__module__]
+            app_name = app_module.__name__.rsplit('.', 1)[0]
+        new_class.add_to_class('_meta', AppOptions(app_name, meta))
+        # Send the signal that the app has been loaded
+        app_prepared.send(sender=cls)
+        return new_class
+
+    def add_to_class(cls, name, value):
+        if hasattr(value, 'contribute_to_class'):
+            value.contribute_to_class(cls, name)
+        else:
+            setattr(cls, name, value)
+
 
 class App(object):
     """
-    Base App class.
+    The base app class to be subclassed for own uses.
     """
-    def __init__(self, path):
-        self.path = path
-
-        # get the name from the path e.g. "auth" for "django.contrib.auth"
-        if '.' in path:
-            self.name = path.rsplit('.', 1)[1]
-        else:
-            self.name = path
-
-        self.verbose_name = _(self.name.title())
-        self.db_prefix = self.name
-        self.errors = []
-        self.models = []
-        self.models_path = '%s.models' % self.path
-        self.module = None
+    __metaclass__ = AppBase
 
     def __str__(self):
-        return self.name
+        return self._meta.name
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, self.name)
+        return '<%s: %s>' % (self.__class__.__name__, self._meta.label)
+
+    @classmethod
+    def from_name(cls, name):
+        cls_name = get_class_name(name.split('.')[-1])
+        return type("%sApp" % cls_name, (cls,), {'_name': name})
+
 
 class AppCache(object):
     """
@@ -87,7 +157,9 @@ class AppCache(object):
                 app_module, app_classname = app_name.rsplit('.', 1)
                 app_module = import_module(app_module)
                 app_class = getattr(app_module, app_classname)
-                app_name = app_name.rsplit('.', 2)[0]
+                if not issubclass(app_class, App):
+                    raise ImproperlyConfigured("'%s' must be a subclass of "
+                                               "django.core.apps.App" % app_name)
                 self.load_app(app_name, True, app_class)
 
             # load apps listed in INSTALLED_APPS
@@ -102,30 +174,28 @@ class AppCache(object):
                 # since the cache is still unseeded at this point
                 # all models have been stored as unbound models
                 # we need to assign the models to the app instances
-                for app_name, models in self.unbound_models.iteritems():
-                    app_instance = self.find_app(app_name)
+                for app_label, models in self.unbound_models.iteritems():
+                    app_instance = self.find_app(app_label)
                     if not app_instance:
                         raise ImproperlyConfigured(
-                                'Could not find an app instance for "%s"'
-                                % app_label)
+                            'Could not find an app instance for "%s"' % app_label)
                     for model in models.itervalues():
-                        app_instance.models.append(model)
+                        app_instance._meta.models.append(model)
                 # check if there is more than one app with the same
                 # db_prefix attribute
-                for app in self.app_instances:
-                    for app_cmp in self.app_instances:
-                        if app != app_cmp and \
-                                app.db_prefix == app_cmp.db_prefix:
+                for app1 in self.app_instances:
+                    for app2 in self.app_instances:
+                        if (app1 != app2 and
+                                app1._meta.db_prefix == app2._meta.db_prefix):
                             raise ImproperlyConfigured(
-                                'The apps "%s" and "%s" have the same '
-                                'db_prefix "%s"'
-                                % (app, app_cmp, app.db_prefix))
+                                'The apps "%s" and "%s" have the same db_prefix "%s"'
+                                % (app1, app2, app1._meta.db_prefix))
                 self.loaded = True
                 self.unbound_models = {}
         finally:
             self.write_lock.release()
 
-    def load_app(self, app_name, can_postpone=False, app_class=App):
+    def load_app(self, app_name, can_postpone=False, app_class=None):
         """
         Loads the app with the provided fully qualified name, and returns the
         model module.
@@ -140,23 +210,24 @@ class AppCache(object):
         self.handled[app_name] = None
         self.nesting_level += 1
 
-        app_module = import_module(app_name)
-
         # check if an app instance with app_name already exists, if not
         # then create one
-        app_instance = self.find_app(app_name)
+        app_instance = self.find_app(app_name.split('.')[-1])
+
         if not app_instance:
-            app_instance = app_class(app_name)
-            app_instance.module = app_module
+            if app_class:
+                app_instance = app_class()
+            else:
+                app_instance = App.from_name(app_name)()
             self.app_instances.append(app_instance)
 
         try:
-            models = import_module(app_instance.models_path)
+            models = import_module(app_instance._meta.models_path)
         except ImportError:
             self.nesting_level -= 1
             # If the app doesn't have a models module, we can just ignore the
             # ImportError and return no models for it.
-            if not module_has_submodule(app_module, 'models'):
+            if not module_has_submodule(app_instance._meta.module, 'models'):
                 return None
             # But if the app does have a models module, we need to figure out
             # whether to suppress or propagate the error. If can_postpone is
@@ -173,15 +244,15 @@ class AppCache(object):
                     raise
 
         self.nesting_level -= 1
-        app_instance.models_module = models
+        app_instance._meta.models_module = models
         return models
-    
-    def find_app(self, name):
+
+    def find_app(self, label):
         """
-        Returns the app instance that matches name
+        Returns the app instance that matches the given label.
         """
         for app in self.app_instances:
-            if app.name == name:
+            if app._meta.label == label:
                 return app
 
     def app_cache_ready(self):
@@ -194,10 +265,12 @@ class AppCache(object):
         return self.loaded
 
     def get_apps(self):
-        "Returns a list of all models modules."
+        """
+        Returns a list of all models modules.
+        """
         self._populate()
-        return [app.models_module for app in self.app_instances\
-                if hasattr(app, 'models_module')]
+        return [app._meta.models_module for app in self.app_instances
+                if hasattr(app._meta, 'models_module')]
 
     def get_app(self, app_label, emptyOK=False):
         """
@@ -208,24 +281,27 @@ class AppCache(object):
         self.write_lock.acquire()
         try:
             for app in self.app_instances:
-                if app_label == app.name:
-                    mod = self.load_app(app.path, False)
+                if app_label == app._meta.label:
+                    mod = self.load_app(app._meta.name, False)
                     if mod is None:
                         if emptyOK:
                             return None
                     else:
                         return mod
-            raise ImproperlyConfigured("App with label %s could not be found" % app_label)
+            raise ImproperlyConfigured(
+                "App with label %s could not be found" % app_label)
         finally:
             self.write_lock.release()
 
     def get_app_errors(self):
-        "Returns the map of known problems with the INSTALLED_APPS."
+        """
+        Returns the map of known problems with the INSTALLED_APPS.
+        """
         self._populate()
         errors = {}
         for app in self.app_instances:
-            if app.errors:
-                errors.update({app.label: app.errors})
+            if app._meta.errors:
+                errors.update({app._meta.label: app._meta.errors})
         return errors
 
     def get_models(self, app_mod=None, include_auto_created=False, include_deferred=False):
@@ -256,9 +332,8 @@ class AppCache(object):
             app_list = self.app_instances
         model_list = []
         for app in app_list:
-            models = app.models
             model_list.extend(
-                model for model in models
+                model for model in app._meta.models
                 if ((not model._deferred or include_deferred)
                     and (not model._meta.auto_created or include_auto_created))
             )
@@ -278,7 +353,7 @@ class AppCache(object):
         if self.app_cache_ready() and not app:
             return
         if cache.app_cache_ready():
-            for model in app.models:
+            for model in app._meta.models:
                 if model_name.lower() == model._meta.object_name.lower():
                     return model
         else:
@@ -299,7 +374,7 @@ class AppCache(object):
             model_name = model._meta.object_name.lower()
             if self.app_cache_ready():
                 model_dict = dict([(model._meta.object_name.lower(), model)
-                    for model in app_instance.models])
+                    for model in app_instance._meta.models])
             else:
                 model_dict = self.unbound_models.setdefault(app_label, {})
 
@@ -315,7 +390,7 @@ class AppCache(object):
                 if os.path.splitext(fname1)[0] == os.path.splitext(fname2)[0]:
                     continue
             if self.app_cache_ready():
-                app_instance.models.append(model)
+                app_instance._meta.models.append(model)
             else:
                 model_dict[model_name] = model
         self._get_models_cache.clear()
