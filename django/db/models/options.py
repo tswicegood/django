@@ -102,16 +102,14 @@ class Options(object):
         del self.meta
 
         # If the db_table wasn't provided, use the db_prefix + module_name.
+        # Or use the app label when no app instance was found, which happens
+        # when the app cache is not initialized but the model is imported
         if not self.db_table:
             app_instance = cache.find_app(self.app_label)
-            if not app_instance:
-                # use the app label when no app instance was found, this
-                # can happen when the app cache is not initialized but the
-                # model is imported
-                self.db_table = "%s_%s" % (self.app_label, self.module_name)
-            else:
-                self.db_table = "%s_%s" % (app_instance._meta.db_prefix, self.module_name)
-            self.db_table = truncate_name(self.db_table, connection.ops.max_name_length())
+            prefix = (app_instance and app_instance._meta.db_prefix
+                      or self.app_label)
+            self.db_table = truncate_name("%s_%s" % (prefix, self.module_name),
+                                          connection.ops.max_name_length())
 
     def _prepare(self, model):
         if self.order_with_respect_to:
