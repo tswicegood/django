@@ -89,7 +89,7 @@ class GetAppsTests(AppCacheTestCase):
         Test that the correct models modules are returned for apps installed
         via the APP_CLASSES setting
         """
-        settings.APP_CLASSES = ('model_app.apps.MyApp',)
+        settings.APP_CLASSES = ('model_app.app.MyApp',)
         apps = cache.get_apps()
         self.assertTrue(cache.app_cache_ready())
         self.assertEquals(apps[0].__name__, 'model_app.othermodels')
@@ -109,7 +109,7 @@ class GetAppsTests(AppCacheTestCase):
         Test that if an App is listed in both settings (INSTALLED_APPS and
         APP_CLASSES), only one of them (the one in APP_CLASSES) is loaded
         """
-        settings.APP_CLASSES = ('model_app.apps.MyApp',)
+        settings.APP_CLASSES = ('model_app.app.MyApp',)
         settings.INSTALLED_APPS = ('model_app',)
         apps = cache.get_apps()
         self.assertEquals(len(apps), 1)
@@ -129,7 +129,7 @@ class GetAppsTests(AppCacheTestCase):
         have the same db_prefix attribute
         """
         settings.APP_CLASSES = ('nomodel_app.app.MyApp',
-                                'model_app.apps.MyOtherApp',)
+                                'model_app.app.MyOtherApp',)
         self.assertRaises(ImproperlyConfigured, cache.get_apps)
 
 class GetAppTests(AppCacheTestCase):
@@ -140,7 +140,7 @@ class GetAppTests(AppCacheTestCase):
         Test that the correct module is returned when the app was installed
         via the APP_CLASSES setting
         """
-        settings.APP_CLASSES = ('model_app.apps.MyApp',)
+        settings.APP_CLASSES = ('model_app.app.MyApp',)
         rv = cache.get_app('model_app')
         self.assertEquals(rv.__name__, 'model_app.othermodels')
 
@@ -283,7 +283,7 @@ class LoadAppTests(AppCacheTestCase):
         Test that custom models are imported correctly, if the App specifies
         an models_path attribute
         """
-        from model_app.apps import MyApp
+        from model_app.app import MyApp
         rv = cache.load_app('model_app', can_postpone=False, app_class=MyApp)
         app = cache.app_instances[0]
         self.assertEqual(app._meta.models_module.__name__, 'model_app.othermodels')
