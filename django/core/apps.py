@@ -98,11 +98,8 @@ class App(object):
     """
     __metaclass__ = AppBase
 
-    def __str__(self):
-        return self._meta.name
-
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, self._meta.label)
+        return '<%s: %s>' % (self.__class__.__name__, self._meta.name)
 
     @classmethod
     def from_name(cls, name):
