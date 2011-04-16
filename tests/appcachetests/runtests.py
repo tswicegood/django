@@ -165,8 +165,8 @@ class GetAppTests(AppCacheTestCase):
         Test that None is returned if emptyOK is True and the module
         has no models
         """
-        settings.INSTALLED_APPS = ('django.contrib.csrf',)
-        module = cache.get_app('csrf', emptyOK=True)
+        settings.INSTALLED_APPS = ('django.contrib.syndication',)
+        module = cache.get_app('syndication', emptyOK=True)
         self.failUnless(module is None)
         self.assertTrue(cache.app_cache_ready())
 
