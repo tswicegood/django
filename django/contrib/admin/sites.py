@@ -358,7 +358,7 @@ class AdminSite(object):
                         app_dict[app_label]['models'].append(model_dict)
                     else:
                         app_dict[app_label] = {
-                            'name': cache.find_app(app_label).verbose_name,
+                            'name': cache.find_app(app_label)._meta.verbose_name,
                             'app_url': app_label + '/',
                             'has_module_perms': has_module_perms,
                             'models': [model_dict],
@@ -408,7 +408,7 @@ class AdminSite(object):
                             # something to display, add in the necessary meta
                             # information.
                             app_dict = {
-                                'name': app_instance.verbose_name,
+                                'name': app_instance._meta.verbose_name,
                                 'app_url': '',
                                 'has_module_perms': has_module_perms,
                                 'models': [model_dict],
@@ -418,7 +418,7 @@ class AdminSite(object):
         # Sort the models alphabetically within each app.
         app_dict['models'].sort(key=lambda x: x['name'])
         context = {
-            'title': _('%s administration') % app_instance.verbose_name,
+            'title': _('%s administration') % app_instance._meta.verbose_name,
             'app_list': [app_dict],
             'root_path': self.root_path,
         }

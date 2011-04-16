@@ -113,8 +113,8 @@ def get_commands():
         # Find and load the management module for each installed app.
         for app in apps:
             try:
-                path = find_management_module(app.path)
-                _commands.update(dict([(name, app.path)
+                path = find_management_module(app._meta.name)
+                _commands.update(dict([(name, app._meta.name)
                                        for name in find_commands(path)]))
             except ImportError:
                 pass # No management module - ignore this app

@@ -37,7 +37,7 @@ class Command(NoArgsCommand):
         # dispatcher events.
         for app in cache.app_instances:
             try:
-                import_module('.management', app.path)
+                import_module('.management', app._meta.name)
             except ImportError, exc:
                 # This is slightly hackish. We want to ignore ImportErrors
                 # if the "management" module itself is missing -- but we don't
