@@ -20,6 +20,12 @@ class AppCacheTestCase(unittest.TestCase):
         self.old_app_classes = settings.APP_CLASSES
         settings.APP_CLASSES = ()
         settings.INSTALLED_APPS = ()
+        settings.DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:'
+            }
+        }
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_installed_apps
