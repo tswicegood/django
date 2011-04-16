@@ -3,7 +3,7 @@ Wrapper for loading templates from the filesystem.
 """
 
 from django.conf import settings
-from django.template import TemplateDoesNotExist
+from django.template.base import TemplateDoesNotExist
 from django.template.loader import BaseLoader
 from django.utils._os import safe_join
 
@@ -49,13 +49,3 @@ class Loader(BaseLoader):
     load_template_source.is_usable = True
 
 _loader = Loader()
-
-def load_template_source(template_name, template_dirs=None):
-    # For backwards compatibility
-    import warnings
-    warnings.warn(
-        "'django.template.loaders.filesystem.load_template_source' is deprecated; use 'django.template.loaders.filesystem.Loader' instead.",
-        PendingDeprecationWarning
-    )
-    return _loader.load_template_source(template_name, template_dirs)
-load_template_source.is_usable = True

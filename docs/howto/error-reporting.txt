@@ -1,5 +1,5 @@
-Error reporting via e-mail
-==========================
+Error reporting via email
+=========================
 
 When you're running a public site you should always turn off the
 :setting:`DEBUG` setting. That will make your server run much faster, and will
@@ -14,7 +14,7 @@ configured to email you details of those errors.
 Server errors
 -------------
 
-When :setting:`DEBUG` is ``False``, Django will e-mail the users listed in the
+When :setting:`DEBUG` is ``False``, Django will email the users listed in the
 :setting:`ADMINS` setting whenever your code raises an unhandled exception and
 results in an internal server error (HTTP status code 500). This gives the
 administrators immediate notification of any errors. The :setting:`ADMINS` will
@@ -23,7 +23,7 @@ the HTTP request that caused the error.
 
 .. note::
 
-   In order to send e-mail, Django requires a few settings telling it
+   In order to send email, Django requires a few settings telling it
    how to connect to your mail server. At the very least, you'll need
    to specify :setting:`EMAIL_HOST` and possibly
    :setting:`EMAIL_HOST_USER` and :setting:`EMAIL_HOST_PASSWORD`,
@@ -39,6 +39,14 @@ address, modify the :setting:`SERVER_EMAIL` setting.
 To disable this behavior, just remove all entries from the :setting:`ADMINS`
 setting.
 
+.. seealso::
+
+   .. versionadded:: 1.3
+
+   Server error emails are sent using the logging framework, so you can
+   customize this behaviour by :doc:`customizing your logging configuration
+   </topics/logging>`.
+
 404 errors
 ----------
 
@@ -52,10 +60,10 @@ not found" errors). Django sends emails about 404 errors when:
     * Your :setting:`MIDDLEWARE_CLASSES` setting includes ``CommonMiddleware``
       (which it does by default).
 
-If those conditions are met, Django will e-mail the users listed in the
+If those conditions are met, Django will email the users listed in the
 :setting:`MANAGERS` setting whenever your code raises a 404 and the request has
-a referer. (It doesn't bother to e-mail for 404s that don't have a referer --
-those are usually just people typing in broken URLs or broken web 'bots).
+a referer. (It doesn't bother to email for 404s that don't have a referer --
+those are usually just people typing in broken URLs or broken Web 'bots).
 
 You can tell Django to stop reporting particular 404s by tweaking the
 :setting:`IGNORABLE_404_ENDS` and :setting:`IGNORABLE_404_STARTS` settings. Both
@@ -76,3 +84,12 @@ The best way to disable this behavior is to set
     :ref:`exception middleware <exception-middleware>`. If you do write custom
     error handling, it's a good idea to emulate Django's built-in error handling
     and only report/log errors if :setting:`DEBUG` is ``False``.
+
+.. seealso::
+
+   .. versionadded:: 1.3
+
+   404 errors are logged using the logging framework. By default, these log
+   records are ignored, but you can use them for error reporting by writing a
+   handler and :doc:`configuring logging </topics/logging>` appropriately.
+

@@ -30,7 +30,7 @@ Django 1.2 introduces several large, important new features, including:
     * Hooks for `object-level permissions`_, `permissions for anonymous users`_,
       and `more flexible username requirements`_.
 
-    * Customization of e-mail sending via `e-mail backends`_.
+    * Customization of email sending via `email backends`_.
 
     * New :ref:`"smart" if template tag <new-in-1.2-smart-if>` which supports
       comparison operators.
@@ -184,23 +184,23 @@ The built-in :class:`~django.contrib.auth.models.User` model's
 :attr:`~django.contrib.auth.models.User.username` field now allows a wider range
 of characters, including ``@``, ``+``, ``.`` and ``-`` characters.
 
-E-mail backends
----------------
+Email backends
+--------------
 
-You can now :ref:`configure the way that Django sends e-mail
-<topic-email-backends>`. Instead of using SMTP to send all e-mail, you
-can now choose a configurable e-mail backend to send messages. If your
+You can now :ref:`configure the way that Django sends email
+<topic-email-backends>`. Instead of using SMTP to send all email, you
+can now choose a configurable email backend to send messages. If your
 hosting provider uses a sandbox or some other non-SMTP technique for
-sending mail, you can now construct an e-mail backend that will allow
+sending mail, you can now construct an email backend that will allow
 Django's standard :doc:`mail sending methods</topics/email>` to use
 those facilities.
 
 This also makes it easier to debug mail sending. Django ships with
-backend implementations that allow you to send e-mail to a
+backend implementations that allow you to send email to a
 :ref:`file<topic-email-file-backend>`, to the
 :ref:`console<topic-email-console-backend>`, or to
 :ref:`memory<topic-email-memory-backend>`. You can even configure all
-e-mail to be :ref:`thrown away<topic-email-dummy-backend>`.
+email to be :ref:`thrown away<topic-email-dummy-backend>`.
 
 .. _new-in-1.2-smart-if:
 
@@ -255,6 +255,29 @@ include %}`` tags).
 As a side effect, it is now much easier to support non-Django template
 languages. For more details, see the :ref:`notes on supporting
 non-Django template languages<topic-template-alternate-language>`.
+
+Class-based template loaders
+----------------------------
+
+As part of the changes made to introduce `Template caching`_  and following
+a general trend in Django, the template loaders API has been modified
+to use template loading mechanisms that are encapsulated in Python classes as
+opposed to functions, the only method available until Django 1.1.
+
+All the template loaders :ref:`shipped with Django <template-loaders>` have
+been ported to the new API but they still implement the function-based API and
+the template core machinery still accepts function-based loaders (builtin or
+third party) so there is no immediate need to modify your
+:setting:`TEMPLATE_LOADERS` setting in existing projects, things will keep
+working if you leave it untouched up to and including the Django 1.3 release.
+
+If you have developed your own custom template loaders we suggest to consider
+porting them to a class-based implementation because the code for backwards
+compatibility with function-based loaders starts its deprecation process in
+Django 1.2 and will be removed in Django 1.4.  There is a description of the
+API these loader classes must implement :ref:`here
+<topic-template-alternate-language>` and you can also examine the source code
+of the loaders shipped with Django.
 
 Natural keys in fixtures
 ------------------------
@@ -329,7 +352,7 @@ are now included:
 
 GeoDjango now supports the rich capabilities added
 in the `PostGIS 1.5 release <http://postgis.refractions.net/documentation/manual-1.5/>`_.
-New features include suppport for the the :ref:`geography type <geography-type>`
+New features include suppport for the :ref:`geography type <geography-type>`
 and enabling of :ref:`distance queries <distance-queries>`
 with non-point geometries on geographic coordinate systems.
 
@@ -412,8 +435,13 @@ should be aware of:
 
  * All contrib apps use a ``csrf_protect`` decorator to protect the view. This
    requires the use of the ``csrf_token`` template tag in the template. If you
-   have used custom templates for contrib views, you MUST READ THE :ref:`UPGRADE
-   INSTRUCTIONS <ref-csrf-upgrading-notes>` to fix those templates.
+   have used custom templates for contrib views, you MUST READ THE UPGRADE
+   INSTRUCTIONS to fix those templates.
+
+   .. admonition:: Documentation removed
+
+      The upgrade notes have been removed in current Django docs. Please refer
+      to the docs for Django 1.3 or older to find these instructions.
 
  * ``CsrfViewMiddleware`` is included in :setting:`MIDDLEWARE_CLASSES` by
    default. This turns on CSRF protection by default, so views that accept
@@ -718,6 +746,13 @@ will need to update your FormSet and/or admin definitions.
 
     :ref:`1.2-js-assisted-inlines`
 
+``email_re``
+------------
+
+An undocumented regular expression for validating email addresses has been moved
+from ``django.form.fields`` to ``django.core.validators``. You will need to
+update your imports if you are using it.
+
 .. _deprecated-features-1.2:
 
 Features deprecated in 1.2
@@ -831,14 +866,18 @@ functionality of ``CsrfResponseMiddleware`` and
 ``CsrfViewMiddleware``, has likewise been deprecated.
 
 Also, the CSRF module has moved from contrib to core, and the old
-imports are deprecated, as described in the :ref:`upgrading notes
-<ref-csrf-upgrading-notes>`.
+imports are deprecated, as described in the upgrading notes.
+
+.. admonition:: Documentation removed
+
+   The upgrade notes have been removed in current Django docs. Please refer
+   to the docs for Django 1.3 or older to find these instructions.
 
 ``SMTPConnection``
 ------------------
 
 The ``SMTPConnection`` class has been deprecated in favor of a generic
-e-mail backend API. Old code that explicitly instantiated an instance
+email backend API. Old code that explicitly instantiated an instance
 of an SMTPConnection::
 
     from django.core.mail import SMTPConnection
@@ -847,7 +886,7 @@ of an SMTPConnection::
     connection.send_messages(messages)
 
 ...should now call :meth:`~django.core.mail.get_connection()` to
-instantiate a generic e-mail connection::
+instantiate a generic email connection::
 
     from django.core.mail import get_connection
     connection = get_connection()
@@ -856,7 +895,7 @@ instantiate a generic e-mail connection::
 
 Depending on the value of the :setting:`EMAIL_BACKEND` setting, this
 may not return an SMTP connection. If you explicitly require an SMTP
-connection with which to send e-mail, you can explicitly request an
+connection with which to send email, you can explicitly request an
 SMTP connection::
 
     from django.core.mail import get_connection
@@ -935,13 +974,6 @@ The same applies to the globals found in ``django.forms.fields``:
   * ``DEFAULT_DATETIME_INPUT_FORMATS``
 
 Use ``django.utils.formats.get_format()`` to get the appropriate formats.
-
-``email_re``
-------------
-
-An undocumented regular expression for validating email addresses has been moved
-from ``django.form.fields`` to ``django.core.validators``. You will need to
-update your imports if you are using it.
 
 Function-based test runners
 ---------------------------
@@ -1137,3 +1169,10 @@ Language code ``no``
 The currently used language code for Norwegian Bokmål ``no`` is being
 replaced by the more common language code ``nb``.
 
+Function-based template loaders
+-------------------------------
+
+Django 1.2 changes the template loading mechanism to use a class-based
+approach. Old style function-based template loaders will still work, but should
+be updated to use the new :ref:`class-based template loaders
+<topic-template-alternate-language>`.

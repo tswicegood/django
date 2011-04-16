@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import os
 import random
 import sys
@@ -11,7 +12,7 @@ except ImportError:
 
 from django.conf import settings
 from django.core.exceptions import SuspiciousOperation
-from django.utils.hashcompat import md5_constructor
+from django.utils.crypto import constant_time_compare, salted_hmac
 
 # Use the system (hardware-based) random number generator if it exists.
 if hasattr(random, 'SystemRandom'):
@@ -83,22 +84,29 @@ class SessionBase(object):
     def delete_test_cookie(self):
         del self[self.TEST_COOKIE_NAME]
 
+    def _hash(self, value):
+        key_salt = "django.contrib.sessions" + self.__class__.__name__
+        return salted_hmac(key_salt, value).hexdigest()
+
     def encode(self, session_dict):
         "Returns the given session dictionary pickled and encoded as a string."
         pickled = pickle.dumps(session_dict, pickle.HIGHEST_PROTOCOL)
-        pickled_md5 = md5_constructor(pickled + settings.SECRET_KEY).hexdigest()
-        return base64.encodestring(pickled + pickled_md5)
+        hash = self._hash(pickled)
+        return base64.encodestring(hash + ":" + pickled)
 
     def decode(self, session_data):
         encoded_data = base64.decodestring(session_data)
-        pickled, tamper_check = encoded_data[:-32], encoded_data[-32:]
-        if md5_constructor(pickled + settings.SECRET_KEY).hexdigest() != tamper_check:
-            raise SuspiciousOperation("User tampered with session cookie.")
         try:
-            return pickle.loads(pickled)
-        # Unpickling can cause a variety of exceptions. If something happens,
-        # just return an empty dictionary (an empty session).
-        except:
+            # could produce ValueError if there is no ':'
+            hash, pickled = encoded_data.split(':', 1)
+            expected_hash = self._hash(pickled)
+            if not constant_time_compare(hash, expected_hash):
+                raise SuspiciousOperation("Session data corrupted")
+            else:
+                return pickle.loads(pickled)
+        except Exception:
+            # ValueError, SuspiciousOperation, unpickling exceptions. If any of
+            # these happen, just return an empty dictionary (an empty session).
             return {}
 
     def update(self, dict_):
@@ -138,7 +146,7 @@ class SessionBase(object):
             # No getpid() in Jython, for example
             pid = 1
         while 1:
-            session_key = md5_constructor("%s%s%s%s"
+            session_key = hashlib.md5("%s%s%s%s"
                     % (randrange(0, MAX_SESSION_KEY), pid, time.time(),
                        settings.SECRET_KEY)).hexdigest()
             if not self.exists(session_key):

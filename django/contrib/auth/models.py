@@ -1,14 +1,16 @@
 import datetime
+import hashlib
 import urllib
 
 from django.contrib import auth
+from django.contrib.auth.signals import user_logged_in
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.db.models.manager import EmptyManager
 from django.contrib.contenttypes.models import ContentType
 from django.utils.encoding import smart_str
-from django.utils.hashcompat import md5_constructor, sha_constructor
 from django.utils.translation import ugettext_lazy as _
+from django.utils.crypto import constant_time_compare
 
 
 UNUSABLE_PASSWORD = '!' # This will never be a valid hash
@@ -27,9 +29,9 @@ def get_hexdigest(algorithm, salt, raw_password):
         return crypt.crypt(raw_password, salt)
 
     if algorithm == 'md5':
-        return md5_constructor(salt + raw_password).hexdigest()
+        return hashlib.md5(salt + raw_password).hexdigest()
     elif algorithm == 'sha1':
-        return sha_constructor(salt + raw_password).hexdigest()
+        return hashlib.sha1(salt + raw_password).hexdigest()
     raise ValueError("Got unknown password algorithm type in password.")
 
 def check_password(raw_password, enc_password):
@@ -38,7 +40,16 @@ def check_password(raw_password, enc_password):
     encryption formats behind the scenes.
     """
     algo, salt, hsh = enc_password.split('$')
-    return hsh == get_hexdigest(algo, salt, raw_password)
+    return constant_time_compare(hsh, get_hexdigest(algo, salt, raw_password))
+
+def update_last_login(sender, user, **kwargs):
+    """
+    A signal receiver which updates the last_login date for
+    the user logging in.
+    """
+    user.last_login = datetime.datetime.now()
+    user.save()
+user_logged_in.connect(update_last_login)
 
 class SiteProfileNotAvailable(Exception):
     pass
@@ -89,7 +100,7 @@ class Group(models.Model):
 
     A user in a group automatically has all the permissions granted to that group. For example, if the group Site editors has the permission can_edit_home_page, any user in that group will have that permission.
 
-    Beyond permissions, groups are a convenient way to categorize users to apply some label, or extended functionality, to them. For example, you could create a group 'Special users', and you could write code that would do special things to those users -- such as giving them access to a members-only portion of your site, or sending them members-only e-mail messages.
+    Beyond permissions, groups are a convenient way to categorize users to apply some label, or extended functionality, to them. For example, you could create a group 'Special users', and you could write code that would do special things to those users -- such as giving them access to a members-only portion of your site, or sending them members-only email messages.
     """
     name = models.CharField(_('name'), max_length=80, unique=True)
     permissions = models.ManyToManyField(Permission, verbose_name=_('permissions'), blank=True)
@@ -104,11 +115,10 @@ class Group(models.Model):
 class UserManager(models.Manager):
     def create_user(self, username, email, password=None):
         """
-        Creates and saves a User with the given username, e-mail and password.
+        Creates and saves a User with the given username, email and password.
         """
-
         now = datetime.datetime.now()
-        
+
         # Normalize the address by lowercasing the domain part of the email
         # address.
         try:
@@ -122,10 +132,7 @@ class UserManager(models.Manager):
                          is_active=True, is_superuser=False, last_login=now,
                          date_joined=now)
 
-        if password:
-            user.set_password(password)
-        else:
-            user.set_unusable_password()
+        user.set_password(password)
         user.save(using=self._db)
         return user
 
@@ -164,8 +171,10 @@ def _user_get_all_permissions(user, obj):
 
 def _user_has_perm(user, perm, obj):
     anon = user.is_anonymous()
+    active = user.is_active
     for backend in auth.get_backends():
-        if not anon or backend.supports_anonymous_user:
+        if (not active and not anon and backend.supports_inactive_user) or \
+                    (not anon or backend.supports_anonymous_user):
             if hasattr(backend, "has_perm"):
                 if obj is not None:
                     if (backend.supports_object_permissions and
@@ -179,8 +188,10 @@ def _user_has_perm(user, perm, obj):
 
 def _user_has_module_perms(user, app_label):
     anon = user.is_anonymous()
+    active = user.is_active
     for backend in auth.get_backends():
-        if not anon or backend.supports_anonymous_user:
+        if (not active and not anon and backend.supports_inactive_user) or \
+                    (not anon or backend.supports_anonymous_user):
             if hasattr(backend, "has_module_perms"):
                 if backend.has_module_perms(user, app_label):
                     return True
@@ -238,11 +249,14 @@ class User(models.Model):
         return full_name.strip()
 
     def set_password(self, raw_password):
-        import random
-        algo = 'sha1'
-        salt = get_hexdigest(algo, str(random.random()), str(random.random()))[:5]
-        hsh = get_hexdigest(algo, salt, raw_password)
-        self.password = '%s$%s$%s' % (algo, salt, hsh)
+        if raw_password is None:
+            self.set_unusable_password()
+        else:
+            import random
+            algo = 'sha1'
+            salt = get_hexdigest(algo, str(random.random()), str(random.random()))[:5]
+            hsh = get_hexdigest(algo, salt, raw_password)
+            self.password = '%s$%s$%s' % (algo, salt, hsh)
 
     def check_password(self, raw_password):
         """
@@ -265,7 +279,11 @@ class User(models.Model):
         self.password = UNUSABLE_PASSWORD
 
     def has_usable_password(self):
-        return self.password != UNUSABLE_PASSWORD
+        if self.password is None \
+            or self.password == UNUSABLE_PASSWORD:
+            return False
+        else:
+            return True
 
     def get_group_permissions(self, obj=None):
         """
@@ -297,12 +315,9 @@ class User(models.Model):
         auth backend is assumed to have permission in general. If an object
         is provided, permissions for this specific object are checked.
         """
-        # Inactive users have no permissions.
-        if not self.is_active:
-            return False
 
-        # Superusers have all permissions.
-        if self.is_superuser:
+        # Active superusers have all permissions.
+        if self.is_active and self.is_superuser:
             return True
 
         # Otherwise we need to check the backends.
@@ -324,23 +339,14 @@ class User(models.Model):
         Returns True if the user has any permissions in the given app
         label. Uses pretty much the same logic as has_perm, above.
         """
-        if not self.is_active:
-            return False
-
-        if self.is_superuser:
+        # Active superusers have all permissions.
+        if self.is_active and self.is_superuser:
             return True
 
         return _user_has_module_perms(self, app_label)
 
-    def get_and_delete_messages(self):
-        messages = []
-        for m in self.message_set.all():
-            messages.append(m.message)
-            m.delete()
-        return messages
-
     def email_user(self, subject, message, from_email=None):
-        "Sends an e-mail to this User."
+        "Sends an email to this User."
         from django.core.mail import send_mail
         send_mail(subject, message, from_email, [self.email])
 
@@ -373,28 +379,6 @@ class User(models.Model):
                 raise SiteProfileNotAvailable
         return self._profile_cache
 
-    def _get_message_set(self):
-        import warnings
-        warnings.warn('The user messaging API is deprecated. Please update'
-                      ' your code to use the new messages framework.',
-                      category=PendingDeprecationWarning)
-        return self._message_set
-    message_set = property(_get_message_set)
-
-class Message(models.Model):
-    """
-    The message system is a lightweight way to queue messages for given
-    users. A message is associated with a User instance (so it is only
-    applicable for registered users). There's no concept of expiration or
-    timestamps. Messages are created by the Django admin after successful
-    actions. For example, "The poll Foo was created successfully." is a
-    message.
-    """
-    user = models.ForeignKey(User, related_name='_message_set')
-    message = models.TextField(_('message'))
-
-    def __unicode__(self):
-        return self.message
 
 class AnonymousUser(object):
     id = None
@@ -460,9 +444,6 @@ class AnonymousUser(object):
 
     def has_module_perms(self, module):
         return _user_has_module_perms(self, module)
-
-    def get_and_delete_messages(self):
-        return []
 
     def is_anonymous(self):
         return True

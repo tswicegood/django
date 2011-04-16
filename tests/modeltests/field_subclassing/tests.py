@@ -2,7 +2,7 @@ from django.core import serializers
 from django.test import TestCase
 
 from fields import Small
-from models import DataModel, MyModel
+from models import DataModel, MyModel, OtherModel
 
 
 class CustomField(TestCase):
@@ -55,7 +55,7 @@ class CustomField(TestCase):
 
         # Serialization works, too.
         stream = serializers.serialize("json", MyModel.objects.all())
-        self.assertEqual(stream, '[{"pk": 1, "model": "field_subclassing.mymodel", "fields": {"data": "12", "name": "m"}}]')
+        self.assertEqual(stream, '[{"pk": %d, "model": "field_subclassing.mymodel", "fields": {"data": "12", "name": "m"}}]' % m1.pk)
 
         obj = list(serializers.deserialize("json", stream))[0]
         self.assertEqual(obj.object, m)
@@ -73,3 +73,9 @@ class CustomField(TestCase):
             ],
             lambda m: str(m.data)
         )
+
+    def test_field_subclassing(self):
+        o = OtherModel.objects.create(data=Small("a", "b"))
+        o = OtherModel.objects.get()
+        self.assertEqual(o.data.first, "a")
+        self.assertEqual(o.data.second, "b")

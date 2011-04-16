@@ -2,35 +2,33 @@ import copy
 import os
 import sys
 import time
-from unittest import TestCase
 
 from django.conf import Settings
 from django.db.models.loading import cache, load_app
+from django.utils.unittest import TestCase
+
 
 class InstalledAppsGlobbingTest(TestCase):
-
     def setUp(self):
-        self.old_path = sys.path
+        self.OLD_SYS_PATH = sys.path[:]
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        self.old_tz = os.environ.get("TZ")
-        self.settings = Settings('test_settings')
-
-    def tearDown(self):
-        sys.path = self.old_path
-        # Undo a side-effect of installing a new settings object.
-        if hasattr(time, "tzset") and self.old_tz:
-            os.environ["TZ"] = self.old_tz
-            time.tzset()
+        self.OLD_TZ = os.environ.get("TZ")
 
     def test_globbing(self):
-        """Test the globbing of INSTALLED_APPS"""
-        self.assertEqual(self.settings.INSTALLED_APPS,
-                ['parent.app', 'parent.app1', 'parent.app_2'])
+        settings = Settings('test_settings')
+        self.assertEqual(settings.INSTALLED_APPS, ['parent.app', 'parent.app1', 'parent.app_2'])
+
+    def tearDown(self):
+        sys.path = self.OLD_SYS_PATH
+        if hasattr(time, "tzset") and self.OLD_TZ:
+            os.environ["TZ"] = self.OLD_TZ
+            time.tzset()
+
 
 class EggLoadingTest(TestCase):
 
     def setUp(self):
-        self.old_path = sys.path
+        self.old_path = sys.path[:]
         self.egg_dir = '%s/eggs' % os.path.dirname(__file__)
 
         # This test adds dummy applications to the app cache. These
@@ -49,28 +47,28 @@ class EggLoadingTest(TestCase):
         egg_name = '%s/modelapp.egg' % self.egg_dir
         sys.path.append(egg_name)
         models = load_app('app_with_models')
-        self.failIf(models is None)
+        self.assertFalse(models is None)
 
     def test_egg2(self):
         """Loading an app from an egg that has no models returns no models (and no error)"""
         egg_name = '%s/nomodelapp.egg' % self.egg_dir
         sys.path.append(egg_name)
         models = load_app('app_no_models')
-        self.failUnless(models is None)
+        self.assertTrue(models is None)
 
     def test_egg3(self):
         """Models module can be loaded from an app located under an egg's top-level package"""
         egg_name = '%s/omelet.egg' % self.egg_dir
         sys.path.append(egg_name)
         models = load_app('omelet.app_with_models')
-        self.failIf(models is None)
+        self.assertFalse(models is None)
 
     def test_egg4(self):
         """Loading an app with no models from under the top-level egg package generates no error"""
         egg_name = '%s/omelet.egg' % self.egg_dir
         sys.path.append(egg_name)
         models = load_app('omelet.app_no_models')
-        self.failUnless(models is None)
+        self.assertTrue(models is None)
 
     def test_egg5(self):
         """Loading an app from an egg that has an import error in its models module raises that error"""
@@ -82,4 +80,4 @@ class EggLoadingTest(TestCase):
         except ImportError, e:
             # Make sure the message is indicating the actual
             # problem in the broken app.
-            self.failUnless("modelz" in e.args[0])
+            self.assertTrue("modelz" in e.args[0])

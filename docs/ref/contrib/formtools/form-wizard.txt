@@ -5,12 +5,10 @@ Form wizard
 .. module:: django.contrib.formtools.wizard
     :synopsis: Splits forms across multiple Web pages.
 
-.. versionadded:: 1.0
-
 Django comes with an optional "form wizard" application that splits
 :doc:`forms </topics/forms/index>` across multiple Web pages. It maintains
-state in hashed HTML :samp:`<input type="hidden">` fields, and the data isn't
-processed server-side until the final form is submitted.
+state in hashed HTML :samp:`<input type="hidden">` fields so that the full
+server-side processing can be delayed until the submission of the final form.
 
 You might want to use this if you have a lengthy form that would be too
 unwieldy for display on a single page. The first page might ask the user for
@@ -37,7 +35,7 @@ Here's the basic workflow for how a user would use a wizard:
     3. Step 1 and 2 repeat, for every subsequent form in the wizard.
     4. Once the user has submitted all the forms and all the data has been
        validated, the wizard processes the data -- saving it to the database,
-       sending an e-mail, or whatever the application needs to do.
+       sending an email, or whatever the application needs to do.
 
 Usage
 =====
@@ -69,7 +67,7 @@ convention is to put them in a file called :file:`forms.py` in your
 application.
 
 For example, let's write a "contact form" wizard, where the first page's form
-collects the sender's e-mail address and subject, and the second page collects
+collects the sender's email address and subject, and the second page collects
 the message itself. Here's what the :file:`forms.py` might look like::
 
     from django import forms
@@ -193,7 +191,7 @@ wizard takes a list of your :class:`~django.forms.Form` objects as
 arguments when you instantiate the Wizard::
 
     from django.conf.urls.defaults import *
-    from mysite.testapp.forms import ContactForm1, ContactForm2, ContactWizard
+    from testapp.forms import ContactForm1, ContactForm2, ContactWizard
 
     urlpatterns = patterns('',
         (r'^contact/$', ContactWizard([ContactForm1, ContactForm2])),
@@ -240,7 +238,7 @@ Advanced ``FormWizard`` methods
     Calculates the security hash for the given request object and
     :class:`~django.forms.Form` instance.
 
-    By default, this uses an MD5 hash of the form data and your
+    By default, this generates a SHA1 HMAC using your form data and your
     :setting:`SECRET_KEY` setting. It's rare that somebody would need to
     override this.
 

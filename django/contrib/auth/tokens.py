@@ -1,6 +1,7 @@
 from datetime import date
 from django.conf import settings
 from django.utils.http import int_to_base36, base36_to_int
+from django.utils.crypto import constant_time_compare, salted_hmac
 
 class PasswordResetTokenGenerator(object):
     """
@@ -30,7 +31,7 @@ class PasswordResetTokenGenerator(object):
             return False
 
         # Check that the timestamp/uid has not been tampered with
-        if self._make_token_with_timestamp(user, ts) != token:
+        if not constant_time_compare(self._make_token_with_timestamp(user, ts), token):
             return False
 
         # Check the timestamp is within limit
@@ -50,10 +51,11 @@ class PasswordResetTokenGenerator(object):
         # last_login will also change), we produce a hash that will be
         # invalid as soon as it is used.
         # We limit the hash to 20 chars to keep URL short
-        from django.utils.hashcompat import sha_constructor
-        hash = sha_constructor(settings.SECRET_KEY + unicode(user.id) +
-                               user.password + user.last_login.strftime('%Y-%m-%d %H:%M:%S') +
-                               unicode(timestamp)).hexdigest()[::2]
+        key_salt = "django.contrib.auth.tokens.PasswordResetTokenGenerator"
+        value = unicode(user.id) + \
+            user.password + user.last_login.strftime('%Y-%m-%d %H:%M:%S') + \
+            unicode(timestamp)
+        hash = salted_hmac(key_salt, value).hexdigest()[::2]
         return "%s-%s" % (ts_b36, hash)
 
     def _num_days(self, dt):
