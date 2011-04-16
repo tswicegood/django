@@ -67,7 +67,7 @@ class AppBase(type):
         if not parents:
             # If this isn't a subclass of App, don't do anything special.
             return super_new(cls, name, bases, attrs)
-        module = attrs.pop('__module__', cls.__module__)
+        module = attrs.pop('__module__', None)
         new_class = super_new(cls, name, bases, {'__module__': module})
         attr_meta = attrs.pop('Meta', None)
         if not attr_meta:
