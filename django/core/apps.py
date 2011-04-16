@@ -6,7 +6,6 @@ import threading
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.dispatch import Signal
-from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 

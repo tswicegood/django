@@ -1,10 +1,8 @@
-import copy
 import sys
 import unittest
 import threading
 
 from django.conf import settings
-from django.utils.datastructures import SortedDict
 from django.core.exceptions import ImproperlyConfigured
 from django.core.apps import cache
 
@@ -28,13 +26,13 @@ class AppCacheTestCase(unittest.TestCase):
         settings.APP_CLASSES = self.old_app_classes
 
         # The appcache imports models modules. We need to delete the
-        # imported module from sys.modules after the test has run. 
-        # If the module is imported again, the ModelBase.__new__ can 
+        # imported module from sys.modules after the test has run.
+        # If the module is imported again, the ModelBase.__new__ can
         # register the models with the appcache anew.
-        # Some models modules import other models modules (for example 
-        # django.contrib.auth relies on django.contrib.contenttypes). 
+        # Some models modules import other models modules (for example
+        # django.contrib.auth relies on django.contrib.contenttypes).
         # To detect which model modules have been imported, we go through
-        # all loaded model classes and remove their respective module 
+        # all loaded model classes and remove their respective module
         # from sys.modules
         for app in cache.unbound_models.itervalues():
             for name in app.itervalues():
@@ -113,7 +111,7 @@ class GetAppsTests(AppCacheTestCase):
         settings.INSTALLED_APPS = ('model_app',)
         apps = cache.get_apps()
         self.assertEquals(len(apps), 1)
-        self.assertEquals(apps[0].__name__, 'model_app.othermodels')        
+        self.assertEquals(apps[0].__name__, 'model_app.othermodels')
 
     def test_empty_models(self):
         """
@@ -186,14 +184,14 @@ class GetModelsTests(AppCacheTestCase):
     def test_get_models(self):
         """Test that the correct model classes are returned"""
         settings.INSTALLED_APPS = ('django.contrib.sites',
-                                   'django.contrib.flatpages',) 
+                                   'django.contrib.flatpages',)
         models = cache.get_models()
         from django.contrib.flatpages.models import Site, FlatPage
         self.assertEqual(len(models), 2)
         self.assertEqual(models[0], Site)
         self.assertEqual(models[1], FlatPage)
         self.assertTrue(cache.app_cache_ready())
-    
+
     def test_app_mod(self):
         """
         Test that the correct model classes are returned if an
