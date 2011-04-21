@@ -2,7 +2,6 @@ import re
 import sys
 import os
 import threading
-import types
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
