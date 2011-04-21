@@ -261,12 +261,12 @@ class AppCache(object):
         app_instance._meta.models_module = models
         return models
 
-    def find_app(self, label):
+    def find_app(self, app_label):
         """
         Returns the app instance that matches the given label.
         """
         for app in self.app_instances:
-            if app._meta.label == label:
+            if app._meta.label == app_label:
                 return app
 
     def app_cache_ready(self):
@@ -294,16 +294,16 @@ class AppCache(object):
         self._populate()
         self.write_lock.acquire()
         try:
-            for app in self.app_instances:
-                if app_label == app._meta.label:
-                    mod = self.load_app(app._meta.name, False)
-                    if mod is None:
-                        if emptyOK:
-                            return None
-                    else:
-                        return mod
-            raise ImproperlyConfigured(
-                "App with label %s could not be found" % app_label)
+            app = self.find_app(app_label)
+            if app is None:
+                raise ImproperlyConfigured(
+                    "App with label %s could not be found" % app_label)
+            mod = self.load_app(app._meta.name, False)
+            if mod is None:
+                if emptyOK:
+                    return None
+            else:
+                return mod
         finally:
             self.write_lock.release()
 
