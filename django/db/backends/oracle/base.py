@@ -70,6 +70,8 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     needs_datetime_string_cast = False
     interprets_empty_strings_as_nulls = True
     uses_savepoints = True
+    has_select_for_update = True
+    has_select_for_update_nowait = True
     can_return_id_from_insert = True
     allow_sliced_subqueries = False
     supports_subqueries_in_group_by = False
@@ -258,9 +260,8 @@ WHEN (new.%(col_name)s IS NULL)
     def regex_lookup(self, lookup_type):
         # If regex_lookup is called before it's been initialized, then create
         # a cursor to initialize it and recur.
-        from django.db import connection
-        connection.cursor()
-        return connection.ops.regex_lookup(lookup_type)
+        self.connection.cursor()
+        return self.connection.ops.regex_lookup(lookup_type)
 
     def return_insert_id(self):
         return "RETURNING %s INTO %%s", (InsertIdVar(),)
