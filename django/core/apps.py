@@ -182,9 +182,6 @@ class AppCache(object):
         Returns an app class for the given app name, which can be a
         dotted path to an app class or a dotted app module path.
         """
-        # myapp > myapp, None
-        # django.contrib.admin > django.contrib, admin
-        # django.contrib.admin.app.AdminApp > django.contrib.admin.app, AdminApp
         try:
             app_path, app_attr = app_name.rsplit('.', 1)
         except ValueError:
@@ -206,11 +203,13 @@ class AppCache(object):
                     app_class = getattr(app_module, app_attr)
                 except AttributeError:
                     raise ImproperlyConfigured(
-                        "Could not find app '%s' in '%s'" % (app_attr, app_path))
+                        "Could not find app '%s' in "
+                        "module '%s'" % (app_attr, app_path))
                 else:
                     if not issubclass(app_class, App):
                         raise ImproperlyConfigured(
-                            "App '%s' must be a subclass of 'django.core.apps.App'" % app_name)
+                            "App '%s' must be a subclass of "
+                            "'django.core.apps.App'" % app_name)
                     return app_class
         return App.from_name(app_name)
 
