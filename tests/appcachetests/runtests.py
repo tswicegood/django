@@ -230,42 +230,79 @@ class GetModelsTests(AppCacheTestCase):
 class GetModelTests(AppCacheTestCase):
     """Tests for the get_model function"""
 
-    def test_seeded(self):
+    def test_seeded_only_installed_valid(self):
         """
-        Test that the correct model is returned when the cache is seeded
+        Test that the correct model is returned if the cache is seeded
+        and only models from apps listed in INSTALLED_APPS should be returned
         """
         settings.INSTALLED_APPS = ('model_app',)
         rv = cache.get_model('model_app', 'Person')
         self.assertEqual(rv.__name__, 'Person')
         self.assertTrue(cache.app_cache_ready())
 
-    def test_seeded_invalid(self):
+    def test_seeded_only_installed_invalid(self):
         """
-        Test that None is returned if a model was not registered
-        with the seeded cache
+        Test that None is returned if the cache is seeded but the model
+        was not registered with the cache
         """
         rv = cache.get_model('model_app', 'Person')
         self.assertEqual(rv, None)
         self.assertTrue(cache.app_cache_ready())
 
-    def test_unseeded(self):
+    def test_unseeded_only_installed_valid(self):
         """
-        Test that the correct model is returned when the cache is
-        unseeded (but the model was registered using register_models)
+        Test that the correct model is returned if the cache is unseeded, but
+        the model was registered
         """
         from model_app.models import Person
         rv = cache.get_model('model_app', 'Person', seed_cache=False)
         self.assertEqual(rv.__name__, 'Person')
         self.assertFalse(cache.app_cache_ready())
 
-    def test_unseeded_invalid(self):
+    def test_unseeded_only_installed_invalid(self):
         """
-        Test that None is returned if a model was not registered
-        with the unseeded cache
+        Test that None is returned if the cache is unseeded and the model
+        was not registered with the cache
         """
         rv = cache.get_model('model_app', 'Person', seed_cache=False)
         self.assertEqual(rv, None)
         self.assertFalse(cache.app_cache_ready())
+
+    def test_seeded_all_models_valid(self):
+        """
+        Test that the correct model is returned if the cache is seeded and
+        all models (including unbound) should be returned
+        """
+        cache.get_app_errors()
+        from model_app.models import Person
+        rv = cache.get_model('model_app', 'Person', only_installed=False)
+        self.assertEquals(rv, Person)
+
+    def test_seeded_all_models_invalid(self):
+        """
+        Test that None is returned if the cache is seeded and all models
+        should be returned, but the model wasnt registered with the cache
+        """
+        cache.get_app_errors()
+        rv = cache.get_model('model_app', 'Person', only_installed=False)
+        self.assertEquals(rv, None)
+
+    def test_unseeded_all_models_valid(self):
+        """
+        Test that the correct model is returned if the cache is unseeded and
+        all models should be returned
+        """
+        from model_app.models import Person
+        rv = cache.get_model('model_app', 'Person', seed_cache=False, only_installed=False)
+        self.assertEquals(rv, Person)
+
+    def test_unseeded_all_models_invalid(self):
+        """
+        Test that None is returned if the cache is unseeded, all models should
+        be returned but the model wasn't registered with the cache
+        """
+        rv = cache.get_model('model_app', 'Person', seed_cache=False, only_installed=False)
+        self.assertEquals(rv, None)
 
 class LoadAppTests(AppCacheTestCase):
     """Tests for the load_app function"""
@@ -347,8 +384,8 @@ class RegisterModelsTests(AppCacheTestCase):
         cache.get_app_errors()
         self.assertTrue(cache.app_cache_ready())
         from model_app.models import Person
-        self.assertRaises(ImproperlyConfigured, cache.register_models,
-                'model_app_NONEXISTENT', *(Person,))
+        cache.register_models('model_app_NONEXISTENT', *(Person,))
+        self.assertEquals(cache.unbound_models['model_app_NONEXISTENT']['person'], Person)
 
     def test_unseeded_cache(self):
         """

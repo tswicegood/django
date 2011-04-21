@@ -168,13 +168,12 @@ class AppCache(object):
                 for app_name in self.postponed:
                     self.load_app(app_name)
                 # since the cache is still unseeded at this point
-                # all models have been stored as unbound models
+                # all models have been stored as unbound models.
                 # we need to assign the models to the app instances
                 for app_label, models in self.unbound_models.iteritems():
                     app_instance = self.find_app(app_label)
                     if not app_instance:
-                        raise ImproperlyConfigured(
-                            'Could not find an app instance for "%s"' % app_label)
+                        continue
                     for model in models.itervalues():
                         app_instance._meta.models.append(model)
                 # check if there is more than one app with the same
@@ -187,7 +186,6 @@ class AppCache(object):
                                 'The apps "%s" and "%s" have the same db_prefix "%s"'
                                 % (app1, app2, app1._meta.db_prefix))
                 self.loaded = True
-                self.unbound_models = {}
         finally:
             self.write_lock.release()
 
@@ -336,7 +334,7 @@ class AppCache(object):
         self._get_models_cache[cache_key] = model_list
         return model_list
 
-    def get_model(self, app_label, model_name, seed_cache=True):
+    def get_model(self, app_label, model_name, seed_cache=True, only_installed=True):
         """
         Returns the model matching the given app_label and case-insensitive
         model_name.
@@ -346,9 +344,9 @@ class AppCache(object):
         if seed_cache:
             self._populate()
         app = self.find_app(app_label)
-        if self.app_cache_ready() and not app:
+        if only_installed and self.app_cache_ready() and not app:
             return
-        if cache.app_cache_ready():
+        if only_installed and self.app_cache_ready():
             for model in app._meta.models:
                 if model_name.lower() == model._meta.object_name.lower():
                     return model
@@ -361,14 +359,9 @@ class AppCache(object):
         Register a set of models as belonging to an app.
         """
         app_instance = self.find_app(app_label)
-        if self.app_cache_ready() and not app_instance:
-            raise ImproperlyConfigured(
-                'Could not find an app instance with the label "%s". '
-                'Please check your INSTALLED_APPS setting' % app_label)
-
         for model in models:
             model_name = model._meta.object_name.lower()
-            if self.app_cache_ready():
+            if self.app_cache_ready() and app_instance:
                 model_dict = dict([(model._meta.object_name.lower(), model)
                     for model in app_instance._meta.models])
             else:
@@ -385,7 +378,7 @@ class AppCache(object):
                 # comparing.
                 if os.path.splitext(fname1)[0] == os.path.splitext(fname2)[0]:
                     continue
-            if self.app_cache_ready():
+            if self.app_cache_ready() and app_instance:
                 app_instance._meta.models.append(model)
             else:
                 model_dict[model_name] = model
