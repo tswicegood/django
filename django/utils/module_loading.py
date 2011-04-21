@@ -14,6 +14,9 @@ def module_has_submodule(package, module_name):
     for finder in sys.meta_path:
         if finder.find_module(name):
             return True
+    # If this isn't really a package return False right away
+    if not hasattr(package, '__path__'):
+        return False
     for entry in package.__path__:  # No __path__, then not a package.
         try:
             # Try the cached finder.

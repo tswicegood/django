@@ -17,8 +17,6 @@ class AppCacheTestCase(unittest.TestCase):
 
     def setUp(self):
         self.old_installed_apps = settings.INSTALLED_APPS
-        self.old_app_classes = settings.APP_CLASSES
-        settings.APP_CLASSES = ()
         settings.INSTALLED_APPS = ()
         settings.DATABASES = {
             'default': {
@@ -29,7 +27,6 @@ class AppCacheTestCase(unittest.TestCase):
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_installed_apps
-        settings.APP_CLASSES = self.old_app_classes
 
         # The appcache imports models modules. We need to delete the
         # imported module from sys.modules after the test has run.
@@ -64,6 +61,7 @@ class AppCacheTestCase(unittest.TestCase):
         cache.write_lock = threading.RLock()
         cache._get_models_cache = {}
 
+
 class AppCacheReadyTests(AppCacheTestCase):
     """
     Tests for the app_cache_ready function that indicates if the cache
@@ -85,15 +83,70 @@ class AppCacheReadyTests(AppCacheTestCase):
         cache.load_app('nomodel_app', can_postpone=True)
         self.assertFalse(cache.app_cache_ready())
 
+
+class GetAppClassTests(AppCacheTestCase):
+    """Tests for the get_app_class function"""
+
+    def test_app_class(self):
+        """
+        Tests that the full path app class is returned
+        """
+        settings.INSTALLED_APPS = ('model_app.app.MyApp',)
+        from model_app.app import MyApp
+        app_class = cache.get_app_class(settings.INSTALLED_APPS[0])
+        self.assertEquals(app_class, MyApp)
+
+    def test_one_level_module(self):
+        """
+        Tests that a new app class is generated for an one level app module
+        """
+        settings.INSTALLED_APPS = ('model_app',)
+        app_class = cache.get_app_class(settings.INSTALLED_APPS[0])
+        self.assertEquals(app_class.__name__, 'ModelAppApp')
+
+    def test_multi_level_module(self):
+        """
+        Tests that a new app class is generated for a multiple level app module
+        """
+        settings.INSTALLED_APPS = ('django.contrib.admin',)
+        app_class = cache.get_app_class(settings.INSTALLED_APPS[0])
+        self.assertEquals(app_class.__name__, 'AdminApp')
+
+    def test_defunct_module(self):
+        """
+        Tests that a wrong module raises an ImproperlyConfigured exception
+        """
+        settings.INSTALLED_APPS = ('lalalala.admin',)
+        self.assertRaises(ImproperlyConfigured, cache.get_app_class,
+                          settings.INSTALLED_APPS[0])
+
+    def test_missing_attribute(self):
+        """
+        Tests that a missing attribute raises an ImproperlyConfigured exception
+        """
+        settings.INSTALLED_APPS = ('nomodel_app.app.NotThereApp',)
+        self.assertRaises(ImproperlyConfigured, cache.get_app_class,
+                          settings.INSTALLED_APPS[0])
+
+    def test_incorrect_subclass(self):
+        """
+        Tests that a class not subclassing django.core.apps.App raises an
+        ImproperlyConfigured exception
+        """
+        settings.INSTALLED_APPS = ('nomodel_app.app.ObjectApp',)
+        self.assertRaises(ImproperlyConfigured, cache.get_app_class,
+                          settings.INSTALLED_APPS[0])
+
+
 class GetAppsTests(AppCacheTestCase):
     """Tests for the get_apps function"""
 
     def test_app_classes(self):
         """
-        Test that the correct models modules are returned for apps installed
-        via the APP_CLASSES setting
+        Test that the correct models modules are returned for app classes
+        installed via the INSTALLED_APPS setting
         """
-        settings.APP_CLASSES = ('model_app.app.MyApp',)
+        settings.INSTALLED_APPS = ('model_app.app.MyApp',)
         apps = cache.get_apps()
         self.assertTrue(cache.app_cache_ready())
         self.assertEquals(apps[0].__name__, 'model_app.othermodels')
@@ -110,11 +163,10 @@ class GetAppsTests(AppCacheTestCase):
 
     def test_same_app_in_both_settings(self):
         """
-        Test that if an App is listed in both settings (INSTALLED_APPS and
-        APP_CLASSES), only one of them (the one in APP_CLASSES) is loaded
+        Test that if an App is listed multiple times in INSTALLED_APPS
+        only one of them is loaded
         """
-        settings.APP_CLASSES = ('model_app.app.MyApp',)
-        settings.INSTALLED_APPS = ('model_app',)
+        settings.INSTALLED_APPS = ('model_app.app.MyApp', 'model_app')
         apps = cache.get_apps()
         self.assertEquals(len(apps), 1)
         self.assertEquals(apps[0].__name__, 'model_app.othermodels')
@@ -132,9 +184,10 @@ class GetAppsTests(AppCacheTestCase):
         Test that an exception is raised if two app instances
         have the same db_prefix attribute
         """
-        settings.APP_CLASSES = ('nomodel_app.app.MyApp',
-                                'model_app.app.MyOtherApp',)
+        settings.INSTALLED_APPS = ('nomodel_app.app.MyApp',
+                                   'model_app.app.MyOtherApp')
         self.assertRaises(ImproperlyConfigured, cache.get_apps)
+
 
 class GetAppTests(AppCacheTestCase):
     """Tests for the get_app function"""
@@ -142,9 +195,9 @@ class GetAppTests(AppCacheTestCase):
     def test_app_classes(self):
         """
         Test that the correct module is returned when the app was installed
-        via the APP_CLASSES setting
+        via the INSTALLED_APPS setting
         """
-        settings.APP_CLASSES = ('model_app.app.MyApp',)
+        settings.INSTALLED_APPS = ('model_app.app.MyApp',)
         rv = cache.get_app('model_app')
         self.assertEquals(rv.__name__, 'model_app.othermodels')
 
@@ -176,6 +229,7 @@ class GetAppTests(AppCacheTestCase):
         self.failUnless(module is None)
         self.assertTrue(cache.app_cache_ready())
 
+
 class GetAppErrorsTests(AppCacheTestCase):
     """Tests for the get_app_errors function"""
 
@@ -184,13 +238,14 @@ class GetAppErrorsTests(AppCacheTestCase):
         self.assertEqual(cache.get_app_errors(), {})
         self.assertTrue(cache.app_cache_ready())
 
+
 class GetModelsTests(AppCacheTestCase):
     """Tests for the get_models function"""
 
     def test_get_models(self):
         """Test that the correct model classes are returned"""
         settings.INSTALLED_APPS = ('django.contrib.sites',
-                                   'django.contrib.flatpages',)
+                                   'django.contrib.flatpages')
         models = cache.get_models()
         from django.contrib.flatpages.models import Site, FlatPage
         self.assertEqual(len(models), 2)
@@ -204,7 +259,7 @@ class GetModelsTests(AppCacheTestCase):
         app module is specified
         """
         settings.INSTALLED_APPS = ('django.contrib.sites',
-                                   'django.contrib.flatpages',)
+                                   'django.contrib.flatpages')
         # populate cache
         cache.get_app_errors()
 
@@ -218,7 +273,7 @@ class GetModelsTests(AppCacheTestCase):
     def test_include_auto_created(self):
         """Test that auto created models are included if specified"""
         settings.INSTALLED_APPS = ('django.contrib.sites',
-                                   'django.contrib.flatpages',)
+                                   'django.contrib.flatpages')
         models = cache.get_models(include_auto_created=True)
         from django.contrib.flatpages.models import Site, FlatPage
         self.assertEqual(len(models), 3)
@@ -226,6 +281,7 @@ class GetModelsTests(AppCacheTestCase):
         self.assertEqual(models[1], FlatPage)
         self.assertEqual(models[2].__name__, 'FlatPage_sites')
         self.assertTrue(cache.app_cache_ready())
+
 
 class GetModelTests(AppCacheTestCase):
     """Tests for the get_model function"""
@@ -267,6 +323,7 @@ class GetModelTests(AppCacheTestCase):
         self.assertEqual(rv, None)
         self.assertFalse(cache.app_cache_ready())
 
+
 class LoadAppTests(AppCacheTestCase):
     """Tests for the load_app function"""
 
@@ -288,7 +345,7 @@ class LoadAppTests(AppCacheTestCase):
         an models_path attribute
         """
         from model_app.app import MyApp
-        rv = cache.load_app('model_app', can_postpone=False, app_class=MyApp)
+        rv = cache.load_app('model_app.app.MyApp', can_postpone=False)
         app = cache.app_instances[0]
         self.assertEqual(app._meta.models_module.__name__, 'model_app.othermodels')
         self.assertTrue(isinstance(app, MyApp))
@@ -322,6 +379,7 @@ class LoadAppTests(AppCacheTestCase):
         be imported
         """
         self.assertRaises(ImportError, cache.load_app, 'garageland')
+
 
 class RegisterModelsTests(AppCacheTestCase):
     """Tests for the register_models function"""
@@ -357,6 +415,7 @@ class RegisterModelsTests(AppCacheTestCase):
         from model_app.models import Person
         self.assertFalse(cache.app_cache_ready())
         self.assertEquals(cache.unbound_models['model_app']['person'], Person)
+
 
 class FindAppTests(AppCacheTestCase):
     """Tests for the find_app function"""

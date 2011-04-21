@@ -2,6 +2,7 @@ import re
 import sys
 import os
 import threading
+import types
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -146,24 +147,10 @@ class AppCache(object):
             if self.loaded:
                 return
 
-            # load apps listed in APP_CLASSES
-            for app_name in settings.APP_CLASSES:
-                if app_name in self.handled:
-                    continue
-                app_module, app_classname = app_name.rsplit('.', 1)
-                app_module = import_module(app_module)
-                app_class = getattr(app_module, app_classname)
-                if not issubclass(app_class, App):
-                    raise ImproperlyConfigured("'%s' must be a subclass of "
-                                               "django.core.apps.App" % app_name)
-                self.load_app(app_name, True, app_class)
-
-            # load apps listed in INSTALLED_APPS
             for app_name in settings.INSTALLED_APPS:
                 if app_name in self.handled:
                     continue
                 self.load_app(app_name, True)
-
             if not self.nesting_level:
                 for app_name in self.postponed:
                     self.load_app(app_name)
@@ -191,7 +178,44 @@ class AppCache(object):
         finally:
             self.write_lock.release()
 
-    def load_app(self, app_name, can_postpone=False, app_class=None):
+    def get_app_class(self, app_name):
+        """
+        Returns an app class for the given app name, which can be a
+        dotted path to an app class or a dotted app module path.
+        """
+        # myapp > myapp, None
+        # django.contrib.admin > django.contrib, admin
+        # django.contrib.admin.app.AdminApp > django.contrib.admin.app, AdminApp
+        try:
+            app_path, app_attr = app_name.rsplit('.', 1)
+        except ValueError:
+            # First, return a new app class for the given module if
+            # it's one level module path that can't be rsplit (e.g. 'myapp')
+            return App.from_name(app_name)
+        try:
+            # Secondly, try to import the module directly,
+            # because it'll fail with a class path or a bad path
+            app_module = import_module(app_path)
+        except ImportError, e:
+            raise ImproperlyConfigured(
+                "Could not import app '%s': %s" % (app_path, e))
+        else:
+            # Thirdly, check if there is the submodule and fall back if yes
+            # If not look for the app class and do some type checks
+            if not module_has_submodule(app_module, app_attr):
+                try:
+                    app_class = getattr(app_module, app_attr)
+                except AttributeError:
+                    raise ImproperlyConfigured(
+                        "Could not find app '%s' in '%s'" % (app_attr, app_path))
+                else:
+                    if not issubclass(app_class, App):
+                        raise ImproperlyConfigured(
+                            "App '%s' must be a subclass of 'django.core.apps.App'" % app_name)
+                    return app_class
+        return App.from_name(app_name)
+
+    def load_app(self, app_name, can_postpone=False):
         """
         Loads the app with the provided fully qualified name, and returns the
         model module.
@@ -201,7 +225,6 @@ class AppCache(object):
             can_postpone: If set to True and the import raises an ImportError
                 the loading will be postponed and tried again when all other
                 modules are loaded.
-            app_class: The app class of which an instance should be created.
         """
         self.handled[app_name] = None
         self.nesting_level += 1
@@ -211,10 +234,7 @@ class AppCache(object):
         app_instance = self.find_app(app_name.split('.')[-1])
 
         if not app_instance:
-            if app_class:
-                app_instance = app_class()
-            else:
-                app_instance = App.from_name(app_name)()
+            app_instance = self.get_app_class(app_name)()
             self.app_instances.append(app_instance)
 
         try:
