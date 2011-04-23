@@ -4,7 +4,7 @@ import threading
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.core.apps import cache
+from django.core.apps import cache, app_prepared, pre_init, post_init
 
 # remove when tests are integrated into the django testsuite
 settings.configure()
@@ -472,6 +472,50 @@ class FindAppTests(AppCacheTestCase):
         rv = cache.find_app('model_app')
         self.assertEquals(rv._meta.name, 'model_app')
         self.assertTrue(isinstance(rv, App))
+
+class SignalTests(AppCacheTestCase):
+    """Tests for the signals"""
+
+    def setUp(self):
+        super(SignalTests, self).setUp()
+        self.signal_fired = False
+
+    def test_app_prepared(self):
+        """
+        Test the app_prepared signal
+        """
+        # connect the callback before the cache is initialized
+        def app_prepared_callback(sender, app, **kwargs):
+            self.assertEqual(app._meta.name, 'model_app')
+            self.signal_fired = True
+        app_prepared.connect(app_prepared_callback)
+
+        settings.INSTALLED_APPS = ('model_app',)
+        cache._populate()
+        self.assertTrue(cache.app_cache_ready())
+        self.assertTrue(self.signal_fired)
+
+    def test_pre_init(self):
+        """
+        Test the pre_init signal
+        """
+        def callback(sender, **kwargs):
+            self.signal_fired = True
+        pre_init.connect(callback)
+        cache._populate()
+        self.assertTrue(cache.app_cache_ready())
+        self.assertTrue(self.signal_fired)
+
+    def test_post_init(self):
+        """
+        Test the post_init signal
+        """
+        def callback(sender, **kwargs):
+            self.signal_fired = True
+        post_init.connect(callback)
+        cache._populate()
+        self.assertTrue(cache.app_cache_ready())
+        self.assertTrue(self.signal_fired)
 
 if __name__ == '__main__':
     unittest.main()
