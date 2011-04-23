@@ -1,3 +1,4 @@
+import os
 import sys
 import unittest
 import threading
@@ -519,6 +520,69 @@ class SignalTests(AppCacheTestCase):
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
         self.assertTrue(self.signal_fired)
+
+
+class EggLoadingTests(AppCacheTestCase):
+    """Tests loading apps from eggs"""
+
+    def setUp(self):
+        super(EggLoadingTests, self).setUp()
+        self.egg_dir = '%s/eggs' % os.path.abspath(os.path.dirname(__file__))
+        self.old_path = sys.path[:]
+
+    def tearDown(self):
+        super(EggLoadingTests, self).tearDown()
+        sys.path = self.old_path
+
+    def test_egg1(self):
+        """
+        Models module can be loaded from an app in an egg
+        """
+        egg_name = '%s/modelapp.egg' % self.egg_dir
+        sys.path.append(egg_name)
+        models = cache.load_app('app_with_models')
+        self.assertFalse(models is None)
+
+    def test_egg2(self):
+        """
+        Loading an app from an egg that has no models returns no models (and no error)
+        """
+        egg_name = '%s/nomodelapp.egg' % self.egg_dir
+        sys.path.append(egg_name)
+        models = cache.load_app('app_no_models')
+        self.assertTrue(models is None)
+
+    def test_egg3(self):
+        """
+        Models module can be loaded from an app located under an egg's top-level package
+        """
+        egg_name = '%s/omelet.egg' % self.egg_dir
+        sys.path.append(egg_name)
+        models = cache.load_app('omelet.app_with_models')
+        self.assertFalse(models is None)
+
+    def test_egg4(self):
+        """
+        Loading an app with no models from under the top-level egg package generates no error
+        """
+        egg_name = '%s/omelet.egg' % self.egg_dir
+        sys.path.append(egg_name)
+        models = cache.load_app('omelet.app_no_models')
+        self.assertTrue(models is None)
+
+    def test_egg5(self):
+        """
+        Loading an app from an egg that has an import error in its models module raises that error
+        """
+        egg_name = '%s/brokenapp.egg' % self.egg_dir
+        sys.path.append(egg_name)
+        self.assertRaises(ImportError, cache.load_app, 'broken_app')
+        try:
+            cache.load_app('broken_app')
+        except ImportError, e:
+            # Make sure the message is indicating the actual
+            # problem in the broken app.
+            self.assertTrue("modelz" in e.args[0])
 
 if __name__ == '__main__':
     unittest.main()
