@@ -316,7 +316,8 @@ class AppCache(object):
                 errors.update({app._meta.label: app._meta.errors})
         return errors
 
-    def get_models(self, app_mod=None, include_auto_created=False, include_deferred=False):
+    def get_models(self, app_mod=None,
+                   include_auto_created=False, include_deferred=False):
         """
         Given a module containing models, returns a list of the models.
         Otherwise returns a list of all installed models.
@@ -346,13 +347,14 @@ class AppCache(object):
         for app in app_list:
             model_list.extend(
                 model for model in app._meta.models
-                if ((not model._deferred or include_deferred)
-                    and (not model._meta.auto_created or include_auto_created))
+                if ((not model._deferred or include_deferred) and
+                    (not model._meta.auto_created or include_auto_created))
             )
         self._get_models_cache[cache_key] = model_list
         return model_list
 
-    def get_model(self, app_label, model_name, seed_cache=True, only_installed=True):
+    def get_model(self, app_label, model_name,
+                  seed_cache=True, only_installed=True):
         """
         Returns the model matching the given app_label and case-insensitive
         model_name.
