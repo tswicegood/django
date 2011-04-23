@@ -545,7 +545,8 @@ class EggLoadingTests(AppCacheTestCase):
 
     def test_egg2(self):
         """
-        Loading an app from an egg that has no models returns no models (and no error)
+        Loading an app from an egg that has no models returns no models
+        (and no error)
         """
         egg_name = '%s/nomodelapp.egg' % self.egg_dir
         sys.path.append(egg_name)
@@ -554,7 +555,8 @@ class EggLoadingTests(AppCacheTestCase):
 
     def test_egg3(self):
         """
-        Models module can be loaded from an app located under an egg's top-level package
+        Models module can be loaded from an app located under an egg's
+        top-level package
         """
         egg_name = '%s/omelet.egg' % self.egg_dir
         sys.path.append(egg_name)
@@ -563,7 +565,8 @@ class EggLoadingTests(AppCacheTestCase):
 
     def test_egg4(self):
         """
-        Loading an app with no models from under the top-level egg package generates no error
+        Loading an app with no models from under the top-level egg package
+        generates no error
         """
         egg_name = '%s/omelet.egg' % self.egg_dir
         sys.path.append(egg_name)
@@ -572,7 +575,8 @@ class EggLoadingTests(AppCacheTestCase):
 
     def test_egg5(self):
         """
-        Loading an app from an egg that has an import error in its models module raises that error
+        Loading an app from an egg that has an import error in its models
+        module raises that error
         """
         egg_name = '%s/brokenapp.egg' % self.egg_dir
         sys.path.append(egg_name)
