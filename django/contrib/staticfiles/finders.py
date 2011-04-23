@@ -113,14 +113,12 @@ class AppDirectoriesFinder(BaseFinder):
     """
     storage_class = AppStaticStorage
 
-    def __init__(self, apps=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # The list of apps that are handled
         self.apps = []
         # Mapping of app module paths to storage instances
         self.storages = SortedDict()
-        if apps is None:
-            apps = settings.INSTALLED_APPS
-        for app in apps:
+        for app in cache.app_instances:
             app_storage = self.storage_class(app)
             if os.path.isdir(app_storage.location):
                 self.storages[app] = app_storage

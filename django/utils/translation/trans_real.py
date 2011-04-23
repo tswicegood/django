@@ -152,9 +152,8 @@ def translation(language):
                     res.merge(t)
             return res
 
-        for appname in reversed(settings.INSTALLED_APPS):
-            app = import_module(appname)
-            apppath = os.path.join(os.path.dirname(app.__file__), 'locale')
+        for app in reversed(cache.app_instances):
+            apppath = os.path.join(os.path.dirname(app._meta.module.__file__), 'locale')
 
             if os.path.isdir(apppath):
                 res = _merge(apppath)

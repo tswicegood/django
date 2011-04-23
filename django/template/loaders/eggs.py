@@ -20,9 +20,9 @@ class Loader(BaseLoader):
         """
         if resource_string is not None:
             pkg_name = 'templates/' + template_name
-            for app in settings.INSTALLED_APPS:
+            for app in cache.app_instances:
                 try:
-                    return (resource_string(app, pkg_name).decode(settings.FILE_CHARSET), 'egg:%s:%s' % (app, pkg_name))
+                    return (resource_string(app._meta.name, pkg_name).decode(settings.FILE_CHARSET), 'egg:%s:%s' % (app, pkg_name))
                 except:
                     pass
         raise TemplateDoesNotExist(template_name)
