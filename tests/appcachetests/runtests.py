@@ -61,7 +61,6 @@ class AppCacheTestCase(unittest.TestCase):
         cache.write_lock = threading.RLock()
         cache._get_models_cache = {}
 
-
 class AppCacheReadyTests(AppCacheTestCase):
     """
     Tests for the app_cache_ready function that indicates if the cache
@@ -422,7 +421,7 @@ class RegisterModelsTests(AppCacheTestCase):
         in a seeded cache
         """
         settings.INSTALLED_APPS = ('model_app',)
-        cache.get_app_errors()
+        cache._populate()
         self.assertTrue(cache.app_cache_ready())
         app_models = cache.app_instances[0]._meta.models
         self.assertEqual(len(app_models), 1)
@@ -430,11 +429,11 @@ class RegisterModelsTests(AppCacheTestCase):
 
     def test_seeded_cache_invalid_app(self):
         """
-        Test that an exception is raised if the cache is seeded and models
-        are tried to be attached to an app instance that doesn't exist
+        Test that registering models with an app that doesn't have an app
+        instance works
         """
         settings.INSTALLED_APPS = ('model_app',)
-        cache.get_app_errors()
+        cache._populate()
         self.assertTrue(cache.app_cache_ready())
         from model_app.models import Person
         cache.register_models('model_app_NONEXISTENT', *(Person,))
@@ -447,7 +446,6 @@ class RegisterModelsTests(AppCacheTestCase):
         from model_app.models import Person
         self.assertFalse(cache.app_cache_ready())
         self.assertEquals(cache.unbound_models['model_app']['person'], Person)
-
 
 class FindAppTests(AppCacheTestCase):
     """Tests for the find_app function"""
