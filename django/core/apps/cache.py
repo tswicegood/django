@@ -8,7 +8,7 @@ from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 
 from django.core.apps.base import App
-from django.core.apps.signals import pre_apps_loaded, post_apps_loaded
+from django.core.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
 
 
 class AppCache(object):
@@ -137,8 +137,11 @@ class AppCache(object):
         # then create one
         app = self.find_app(app_name.split('.')[-1])
         if not app:
-            app = self.get_app_class(app_name)()
+            app_class = self.get_app_class(app_name)
+            app = app_class()
             self.loaded_apps.append(app)
+            # Send the signal that the app has been loaded
+            app_loaded.send(sender=app_class, app=app)
 
         # import the app's models module and handle ImportErrors
         try:

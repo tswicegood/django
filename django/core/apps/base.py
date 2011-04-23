@@ -2,8 +2,6 @@ import re
 import sys
 
 from django.core.apps.options import AppOptions
-from django.core.apps.signals import app_prepared
-
 
 def get_class_name(module_name):
     new = re.sub(r'_([a-z])', lambda m: (m.group(1).upper()), module_name)
@@ -34,8 +32,6 @@ class AppBase(type):
             app_module = sys.modules[new_class.__module__]
             app_name = app_module.__name__.rsplit('.', 1)[0]
         new_class.add_to_class('_meta', AppOptions(app_name, meta))
-        # Send the signal that the app has been loaded
-        app_prepared.send(sender=cls, app=new_class)
         return new_class
 
     def add_to_class(cls, name, value):
