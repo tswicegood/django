@@ -326,7 +326,7 @@ class GetModelTests(AppCacheTestCase):
         Test that the correct model is returned if the cache is seeded and
         all models (including unbound) should be returned
         """
-        cache.get_app_errors()
+        cache._populate()
         from model_app.models import Person
         model = cache.get_model('model_app', 'Person', only_installed=False)
         self.assertEquals(model, Person)
@@ -336,7 +336,7 @@ class GetModelTests(AppCacheTestCase):
         Test that None is returned if the cache is seeded and all models
         should be returned, but the model wasnt registered with the cache
         """
-        cache.get_app_errors()
+        cache._populate()
         model = cache.get_model('model_app', 'Person', only_installed=False)
         self.assertEquals(model, None)
 
@@ -458,7 +458,7 @@ class FindAppTests(AppCacheTestCase):
         """
         from django.core.apps import App
         settings.INSTALLED_APPS = ('model_app',)
-        cache.get_app_errors()
+        cache._populate()
         self.assertTrue(cache.app_cache_ready())
         app = cache.find_app('model_app')
         self.assertEquals(app._meta.name, 'model_app')
