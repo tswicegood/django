@@ -1,10 +1,8 @@
-import copy
 import os
 import sys
 import time
 
 from django.conf import Settings
-from django.db.models.loading import cache, load_app
 from django.utils.unittest import TestCase
 
 
