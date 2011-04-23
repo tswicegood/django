@@ -20,6 +20,7 @@ class AppOptions(object):
         self.db_prefix = self.label
         self.module = import_module(self.name)
         self.models_path = '%s.models' % self.name
+        self.models_module = None
         self.verbose_name = get_verbose_name(self.label)
 
         # Next, apply any overridden values from 'class Meta'.

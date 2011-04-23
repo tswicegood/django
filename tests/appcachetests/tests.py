@@ -191,15 +191,6 @@ class GetAppsTests(AppCacheTestCase):
 class GetAppTests(AppCacheTestCase):
     """Tests for the get_app function"""
 
-    def test_app_classes(self):
-        """
-        Test that the correct module is returned when the app was installed
-        via the INSTALLED_APPS setting
-        """
-        settings.INSTALLED_APPS = ('model_app.app.MyApp',)
-        mod = cache.get_app('model_app')
-        self.assertEquals(mod.__name__, 'model_app.othermodels')
-
     def test_installed_apps(self):
         """
         Test that the correct module is returned when the app was installed
@@ -207,6 +198,7 @@ class GetAppTests(AppCacheTestCase):
         """
         settings.INSTALLED_APPS = ('model_app',)
         mod = cache.get_app('model_app')
+        self.assertTrue(cache.app_cache_ready())
         self.assertEquals(mod.__name__, 'model_app.models')
 
     def test_not_found_exception(self):
@@ -223,9 +215,19 @@ class GetAppTests(AppCacheTestCase):
         Test that None is returned if emptyOK is True and the module
         has no models
         """
-        settings.INSTALLED_APPS = ('django.contrib.syndication',)
-        module = cache.get_app('syndication', emptyOK=True)
+        settings.INSTALLED_APPS = ('nomodel_app',)
+        module = cache.get_app('nomodel_app', emptyOK=True)
+        self.assertTrue(cache.app_cache_ready())
         self.failUnless(module is None)
+
+    def test_exception_if_no_models(self):
+        """
+        Test that an ImproperlyConfigured exception is raised if the app
+        has no modules and the emptyOK arg is False
+        """
+        settings.INSTALLED_APPS = ('nomodel_app',)
+        self.assertRaises(ImproperlyConfigured, cache.get_app,
+                          'nomodel_app')
         self.assertTrue(cache.app_cache_ready())
 
 

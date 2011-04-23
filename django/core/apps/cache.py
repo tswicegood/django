@@ -193,7 +193,7 @@ class AppCache(object):
         """
         self._populate()
         return [app._meta.models_module for app in self.loaded_apps
-                if hasattr(app._meta, 'models_module')]
+                if app._meta.models_module]
 
     def get_app(self, app_label, emptyOK=False):
         """
@@ -201,20 +201,16 @@ class AppCache(object):
         the app has no models in it and 'emptyOK' is True, returns None.
         """
         self._populate()
-        self.write_lock.acquire()
-        try:
-            app = self.find_app(app_label)
-            if app is None:
-                raise ImproperlyConfigured(
-                    "App with label %s could not be found" % app_label)
-            mod = self.load_app(app._meta.name, False)
+        app = self.find_app(app_label)
+        if app:
+            mod = app._meta.models_module
             if mod is None:
                 if emptyOK:
                     return None
             else:
                 return mod
-        finally:
-            self.write_lock.release()
+        raise ImproperlyConfigured(
+                "App with label %s could not be found" % app_label)
 
     def get_app_errors(self):
         """
