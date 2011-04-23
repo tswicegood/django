@@ -188,44 +188,39 @@ class GetModelsTests(AppCacheTestCase):
     """Tests for the get_models function"""
 
     def test_get_models(self):
-        """Test that the correct model classes are returned"""
-        settings.INSTALLED_APPS = ('django.contrib.sites',
-                                   'django.contrib.flatpages',)
+        """
+        Test that only models from apps are returned that are listed in
+        the INSTALLED_APPS setting
+        """
+        from anothermodel_app.models import Person
+        from model_app.models import Person
+        settings.INSTALLED_APPS = ('model_app',)
         models = cache.get_models()
-        from django.contrib.flatpages.models import Site, FlatPage
-        self.assertEqual(len(models), 2)
-        self.assertEqual(models[0], Site)
-        self.assertEqual(models[1], FlatPage)
         self.assertTrue(cache.app_cache_ready())
+        self.assertEqual(models, [Person])
 
     def test_app_mod(self):
         """
         Test that the correct model classes are returned if an
         app module is specified
         """
-        settings.INSTALLED_APPS = ('django.contrib.sites',
-                                   'django.contrib.flatpages',)
-        # populate cache
-        cache.get_app_errors()
-
-        from django.contrib.flatpages import models
-        from django.contrib.flatpages.models import FlatPage
+        from model_app import models
+        settings.INSTALLED_APPS = ('model_app', 'anothermodel_app',)
         rv = cache.get_models(app_mod=models)
-        self.assertEqual(len(rv), 1)
-        self.assertEqual(rv[0], FlatPage)
         self.assertTrue(cache.app_cache_ready())
+        self.assertEqual(rv, [models.Person])
 
     def test_include_auto_created(self):
-        """Test that auto created models are included if specified"""
-        settings.INSTALLED_APPS = ('django.contrib.sites',
-                                   'django.contrib.flatpages',)
-        models = cache.get_models(include_auto_created=True)
-        from django.contrib.flatpages.models import Site, FlatPage
-        self.assertEqual(len(models), 3)
-        self.assertEqual(models[0], Site)
-        self.assertEqual(models[1], FlatPage)
-        self.assertEqual(models[2].__name__, 'FlatPage_sites')
+        """
+        Test that auto created models are included
+        """
+        settings.INSTALLED_APPS = ('anothermodel_app',)
+        rv = cache.get_models(include_auto_created=True)
         self.assertTrue(cache.app_cache_ready())
+        from anothermodel_app.models import Job, Person
+        self.assertEqual(rv[0].__name__, 'Person_jobs')
+        self.assertEqual(rv[1], Job)
+        self.assertEqual(rv[2], Person)
 
 class GetModelTests(AppCacheTestCase):
     """Tests for the get_model function"""
