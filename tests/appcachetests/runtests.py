@@ -43,7 +43,7 @@ class AppCacheTestCase(unittest.TestCase):
                 if module in sys.modules:
                     del sys.modules[module]
 
-        for app in cache.app_instances:
+        for app in cache.loaded_apps:
             for model in app._meta.models:
                 module = model.__module__
                 if module in sys.modules:
@@ -52,7 +52,7 @@ class AppCacheTestCase(unittest.TestCase):
         # we cannot copy() the whole cache.__dict__ in the setUp function
         # because thread.RLock is un(deep)copyable
         cache.unbound_models = {}
-        cache.app_instances = []
+        cache.loaded_apps = []
 
         cache.loaded = False
         cache.handled = {}
@@ -364,8 +364,8 @@ class LoadAppTests(AppCacheTestCase):
         module is returned
         """
         rv = cache.load_app('model_app')
-        app = cache.app_instances[0]
-        self.assertEqual(len(cache.app_instances), 1)
+        app = cache.loaded_apps[0]
+        self.assertEqual(len(cache.loaded_apps), 1)
         self.assertEqual(app._meta.name, 'model_app')
         self.assertEqual(app._meta.models_module.__name__, 'model_app.models')
         self.assertEqual(rv.__name__, 'model_app.models')
@@ -377,7 +377,7 @@ class LoadAppTests(AppCacheTestCase):
         """
         from model_app.app import MyApp
         rv = cache.load_app('model_app.app.MyApp', can_postpone=False)
-        app = cache.app_instances[0]
+        app = cache.loaded_apps[0]
         self.assertEqual(app._meta.models_module.__name__, 'model_app.othermodels')
         self.assertTrue(isinstance(app, MyApp))
         self.assertEqual(rv.__name__, 'model_app.othermodels')
@@ -388,8 +388,8 @@ class LoadAppTests(AppCacheTestCase):
         no models provided
         """
         rv = cache.load_app('nomodel_app')
-        app = cache.app_instances[0]
-        self.assertEqual(len(cache.app_instances), 1)
+        app = cache.loaded_apps[0]
+        self.assertEqual(len(cache.loaded_apps), 1)
         self.assertEqual(app._meta.name, 'nomodel_app')
         self.assertEqual(rv, None)
 
@@ -400,7 +400,7 @@ class LoadAppTests(AppCacheTestCase):
         """
         rv = cache.load_app('model_app')
         rv2 = cache.load_app('model_app')
-        self.assertEqual(len(cache.app_instances), 1)
+        self.assertEqual(len(cache.loaded_apps), 1)
         self.assertEqual(rv.__name__, 'model_app.models')
         self.assertEqual(rv2.__name__, 'model_app.models')
 
@@ -423,7 +423,7 @@ class RegisterModelsTests(AppCacheTestCase):
         settings.INSTALLED_APPS = ('model_app',)
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
-        app_models = cache.app_instances[0]._meta.models
+        app_models = cache.loaded_apps[0]._meta.models
         self.assertEqual(len(app_models), 1)
         self.assertEqual(app_models[0].__name__, 'Person')
 

@@ -105,9 +105,8 @@ class Options(object):
         # Or use the app label when no app instance was found, which happens
         # when the app cache is not initialized but the model is imported
         if not self.db_table:
-            app_instance = cache.find_app(self.app_label)
-            prefix = (app_instance and app_instance._meta.db_prefix
-                      or self.app_label)
+            app = cache.find_app(self.app_label)
+            prefix = app and app._meta.db_prefix or self.app_label
             self.db_table = truncate_name("%s_%s" % (prefix, self.module_name),
                                           connection.ops.max_name_length())
 

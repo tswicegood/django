@@ -29,7 +29,7 @@ class Command(NoArgsCommand):
 
         # Import the 'management' module within each installed app, to register
         # dispatcher events.
-        for app in cache.app_instances:
+        for app in cache.loaded_apps:
             try:
                 import_module('%s.management' % app._meta.name)
             except ImportError:

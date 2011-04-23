@@ -119,7 +119,7 @@ class AppCache(object):
     # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66531.
     __shared_state = dict(
         # list of loaded app instances
-        app_instances = [],
+        loaded_apps = [],
 
         # Mapping of app_labels to a dictionary of model names to model code.
         unbound_models = {},
@@ -162,15 +162,15 @@ class AppCache(object):
                 # all models have been stored as unbound models.
                 # we need to assign the models to the app instances
                 for app_label, models in self.unbound_models.iteritems():
-                    app_instance = self.find_app(app_label)
-                    if not app_instance:
+                    app = self.find_app(app_label)
+                    if not app:
                         continue
                     for model in models.itervalues():
-                        app_instance._meta.models.append(model)
+                        app._meta.models.append(model)
                 # check if there is more than one app with the same
                 # db_prefix attribute
-                for app1 in self.app_instances:
-                    for app2 in self.app_instances:
+                for app1 in self.loaded_apps:
+                    for app2 in self.loaded_apps:
                         if (app1 != app2 and
                                 app1._meta.db_prefix == app2._meta.db_prefix):
                             raise ImproperlyConfigured(
@@ -234,19 +234,19 @@ class AppCache(object):
 
         # check if an app instance with app_name already exists, if not
         # then create one
-        app_instance = self.find_app(app_name.split('.')[-1])
+        app = self.find_app(app_name.split('.')[-1])
+        if not app:
+            app = self.get_app_class(app_name)()
+            self.loaded_apps.append(app)
 
-        if not app_instance:
-            app_instance = self.get_app_class(app_name)()
-            self.app_instances.append(app_instance)
-
+        # import the app's models module and handle ImportErrors
         try:
-            models = import_module(app_instance._meta.models_path)
+            models = import_module(app._meta.models_path)
         except ImportError:
             self.nesting_level -= 1
             # If the app doesn't have a models module, we can just ignore the
             # ImportError and return no models for it.
-            if not module_has_submodule(app_instance._meta.module, 'models'):
+            if not module_has_submodule(app._meta.module, 'models'):
                 return None
             # But if the app does have a models module, we need to figure out
             # whether to suppress or propagate the error. If can_postpone is
@@ -263,14 +263,14 @@ class AppCache(object):
                     raise
 
         self.nesting_level -= 1
-        app_instance._meta.models_module = models
+        app._meta.models_module = models
         return models
 
     def find_app(self, app_label):
         """
         Returns the app instance that matches the given label.
         """
-        for app in self.app_instances:
+        for app in self.loaded_apps:
             if app._meta.label == app_label:
                 return app
 
@@ -288,7 +288,7 @@ class AppCache(object):
         Returns a list of all models modules.
         """
         self._populate()
-        return [app._meta.models_module for app in self.app_instances
+        return [app._meta.models_module for app in self.loaded_apps
                 if hasattr(app._meta, 'models_module')]
 
     def get_app(self, app_label, emptyOK=False):
@@ -318,7 +318,7 @@ class AppCache(object):
         """
         self._populate()
         errors = {}
-        for app in self.app_instances:
+        for app in self.loaded_apps:
             if app._meta.errors:
                 errors.update({app._meta.label: app._meta.errors})
         return errors
@@ -349,7 +349,7 @@ class AppCache(object):
             if app:
                 app_list = [app]
         else:
-            app_list = self.app_instances
+            app_list = self.loaded_apps
         model_list = []
         for app in app_list:
             model_list.extend(
@@ -385,12 +385,12 @@ class AppCache(object):
         """
         Register a set of models as belonging to an app.
         """
-        app_instance = self.find_app(app_label)
+        app = self.find_app(app_label)
         for model in models:
             model_name = model._meta.object_name.lower()
-            if self.app_cache_ready() and app_instance:
+            if self.app_cache_ready() and app:
                 model_dict = dict([(model._meta.object_name.lower(), model)
-                    for model in app_instance._meta.models])
+                                    for model in app._meta.models])
             else:
                 model_dict = self.unbound_models.setdefault(app_label, {})
 
@@ -405,8 +405,8 @@ class AppCache(object):
                 # comparing.
                 if os.path.splitext(fname1)[0] == os.path.splitext(fname2)[0]:
                     continue
-            if self.app_cache_ready() and app_instance:
-                app_instance._meta.models.append(model)
+            if self.app_cache_ready() and app:
+                app._meta.models.append(model)
             else:
                 model_dict[model_name] = model
         self._get_models_cache.clear()
