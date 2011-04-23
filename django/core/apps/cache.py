@@ -1,113 +1,14 @@
-import re
 import sys
 import os
 import threading
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.dispatch import Signal
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 
-def get_verbose_name(class_name):
-    new = re.sub('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))', ' \\1', class_name)
-    return new.lower().strip()
-
-def get_class_name(module_name):
-    new = re.sub(r'_([a-z])', lambda m: (m.group(1).upper()), module_name)
-    return new[0].upper() + new[1:]
-
-DEFAULT_NAMES = ('verbose_name', 'db_prefix', 'models_path')
-
-app_prepared = Signal(providing_args=["app"])
-pre_apps_loaded = Signal()
-post_apps_loaded = Signal(providing_args=["apps"])
-
-
-class AppOptions(object):
-    def __init__(self, name, meta):
-        self.name = name
-        self.meta = meta
-        self.errors = []
-        self.models = []
-
-    def contribute_to_class(self, cls, name):
-        cls._meta = self
-        # get the name from the path e.g. "auth" for "django.contrib.auth"
-        self.label = self.name.split('.')[-1]
-        self.db_prefix = self.label
-        self.module = import_module(self.name)
-        self.models_path = '%s.models' % self.name
-        self.verbose_name = get_verbose_name(self.label)
-
-        # Next, apply any overridden values from 'class Meta'.
-        if self.meta:
-            meta_attrs = self.meta.__dict__.copy()
-            for name in self.meta.__dict__:
-                # Ignore any private attributes that Django doesn't care about.
-                if name.startswith('_'):
-                    del meta_attrs[name]
-            for attr_name in DEFAULT_NAMES:
-                if attr_name in meta_attrs:
-                    setattr(self, attr_name, meta_attrs.pop(attr_name))
-                elif hasattr(self.meta, attr_name):
-                    setattr(self, attr_name, getattr(self.meta, attr_name))
-
-            # Any leftover attributes must be invalid.
-            if meta_attrs != {}:
-                raise TypeError("'class Meta' got invalid attribute(s): %s"
-                                % ','.join(meta_attrs.keys()))
-        del self.meta
-
-
-class AppBase(type):
-    """
-    Metaclass for all apps.
-    """
-    def __new__(cls, name, bases, attrs):
-        super_new = super(AppBase, cls).__new__
-        parents = [b for b in bases if isinstance(b, AppBase)]
-        if not parents:
-            # If this isn't a subclass of App, don't do anything special.
-            return super_new(cls, name, bases, attrs)
-        module = attrs.pop('__module__', None)
-        new_class = super_new(cls, name, bases, {'__module__': module})
-        attr_meta = attrs.pop('Meta', None)
-        if not attr_meta:
-            meta = getattr(new_class, 'Meta', None)
-        else:
-            meta = attr_meta
-        app_name = attrs.pop('_name', None)
-        if app_name is None:
-            # Figure out the app_name by looking one level up.
-            # For 'django.contrib.sites.app', this would be 'django.contrib.sites'
-            app_module = sys.modules[new_class.__module__]
-            app_name = app_module.__name__.rsplit('.', 1)[0]
-        new_class.add_to_class('_meta', AppOptions(app_name, meta))
-        # Send the signal that the app has been loaded
-        app_prepared.send(sender=cls, app=new_class)
-        return new_class
-
-    def add_to_class(cls, name, value):
-        if hasattr(value, 'contribute_to_class'):
-            value.contribute_to_class(cls, name)
-        else:
-            setattr(cls, name, value)
-
-
-class App(object):
-    """
-    The base app class to be subclassed for own uses.
-    """
-    __metaclass__ = AppBase
-
-    def __repr__(self):
-        return '<App: %s>' % self._meta.name
-
-    @classmethod
-    def from_name(cls, name):
-        cls_name = get_class_name(name.split('.')[-1])
-        return type(cls_name, (cls,), {'_name': name})
+from django.core.apps.base import App
+from django.core.apps.signals import pre_apps_loaded, post_apps_loaded
 
 
 class AppCache(object):
@@ -410,5 +311,3 @@ class AppCache(object):
             else:
                 model_dict[model_name] = model
         self._get_models_cache.clear()
-
-cache = AppCache()

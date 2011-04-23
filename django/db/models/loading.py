@@ -1,12 +1,11 @@
 "Utilities for loading models and the modules that contain them."
 
 from django.conf import settings
-from django.core.apps import AppCache, cache
+from django.core.apps import App, AppCache, cache
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
-from django.core.apps import App
 
 import imp
 import sys
