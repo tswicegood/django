@@ -101,7 +101,7 @@ class GetAppClassTests(AppCacheTestCase):
         """
         settings.INSTALLED_APPS = ('model_app',)
         app_class = cache.get_app_class(settings.INSTALLED_APPS[0])
-        self.assertEquals(app_class.__name__, 'ModelAppApp')
+        self.assertEquals(app_class.__name__, 'ModelApp')
 
     def test_multi_level_module(self):
         """
@@ -109,7 +109,7 @@ class GetAppClassTests(AppCacheTestCase):
         """
         settings.INSTALLED_APPS = ('django.contrib.admin',)
         app_class = cache.get_app_class(settings.INSTALLED_APPS[0])
-        self.assertEquals(app_class.__name__, 'AdminApp')
+        self.assertEquals(app_class.__name__, 'Admin')
 
     def test_defunct_module(self):
         """

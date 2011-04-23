@@ -102,12 +102,12 @@ class App(object):
     __metaclass__ = AppBase
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, self._meta.name)
+        return '<App: %s>' % self._meta.name
 
     @classmethod
     def from_name(cls, name):
         cls_name = get_class_name(name.split('.')[-1])
-        return type("%sApp" % cls_name, (cls,), {'_name': name})
+        return type(cls_name, (cls,), {'_name': name})
 
 
 class AppCache(object):
