@@ -1,13 +1,12 @@
 import re
 from functools import update_wrapper
-from django import http, template
+from django import apps, http, template
 from django.contrib.admin import ModelAdmin, actions
 from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.contenttypes import views as contenttype_views
 from django.views.decorators.csrf import csrf_protect
 from django.db.models.base import ModelBase
-from django.core.apps import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response
@@ -358,7 +357,7 @@ class AdminSite(object):
                         app_dict[app_label]['models'].append(model_dict)
                     else:
                         app_dict[app_label] = {
-                            'name': cache.find_app(app_label)._meta.verbose_name,
+                            'name': apps.find_app(app_label)._meta.verbose_name,
                             'app_url': app_label + '/',
                             'has_module_perms': has_module_perms,
                             'models': [model_dict],
@@ -387,7 +386,7 @@ class AdminSite(object):
         user = request.user
         has_module_perms = user.has_module_perms(app_label)
         app_dict = {}
-        app = cache.find_app(app_label)
+        app = apps.find_app(app_label)
         for model, model_admin in self._registry.items():
             if app_label == model._meta.app_label:
                 if has_module_perms:

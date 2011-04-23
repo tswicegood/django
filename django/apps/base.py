@@ -1,7 +1,7 @@
 import re
 import sys
 
-from django.core.apps.options import AppOptions
+from django.apps.options import AppOptions
 
 def get_class_name(module_name):
     new = re.sub(r'_([a-z])', lambda m: (m.group(1).upper()), module_name)

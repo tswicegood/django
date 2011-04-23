@@ -2,9 +2,9 @@ import sys
 import unittest
 import threading
 
+from django.apps import cache, app_loaded, pre_apps_loaded, post_apps_loaded
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.core.apps import cache, app_loaded, pre_apps_loaded, post_apps_loaded
 
 # remove when tests are integrated into the django testsuite
 settings.configure()
@@ -129,7 +129,7 @@ class GetAppClassTests(AppCacheTestCase):
 
     def test_incorrect_subclass(self):
         """
-        Tests that a class not subclassing django.core.apps.App raises an
+        Tests that a class not subclassing django.apps.App raises an
         ImproperlyConfigured exception
         """
         settings.INSTALLED_APPS = ('nomodel_app.app.ObjectApp',)
@@ -456,7 +456,7 @@ class FindAppTests(AppCacheTestCase):
         """
         Test that the correct app is returned when the cache is seeded
         """
-        from django.core.apps import App
+        from django.apps import App
         settings.INSTALLED_APPS = ('model_app',)
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
@@ -469,7 +469,7 @@ class FindAppTests(AppCacheTestCase):
         """
         Test that the correct app is returned when the cache is unseeded
         """
-        from django.core.apps import App
+        from django.apps import App
         cache.load_app('model_app')
         self.assertFalse(cache.app_cache_ready())
         app = cache.find_app('model_app')

@@ -97,7 +97,7 @@ def get_commands():
 
         # Find the installed apps
         try:
-            from django.core.apps import cache
+            from django.apps import cache
             apps = cache.loaded_apps
         except (AttributeError, EnvironmentError, ImportError):
             apps = []
@@ -420,7 +420,7 @@ def setup_environ(settings_mod, original_settings_path=None):
     sys.path.pop()
 
     # Initialize the appcache and look for errors
-    from django.core.apps import cache
+    from django.apps import cache
     for (app_name, error) in cache.get_app_errors().items():
         sys.stderr.write("%s: %s" % (app_name, error))
         sys.exit(1)

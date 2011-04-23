@@ -1,8 +1,8 @@
 import re
 from bisect import bisect
 
+from django.apps import cache
 from django.conf import settings
-from django.core.apps import cache
 from django.db.models.related import RelatedObject
 from django.db.models.fields.related import ManyToManyRel
 from django.db.models.fields import AutoField, FieldDoesNotExist

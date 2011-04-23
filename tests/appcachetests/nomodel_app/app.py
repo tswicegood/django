@@ -1,6 +1,6 @@
-from django.core.apps import App
+from django import apps
 
-class MyApp(App):
+class MyApp(apps.App):
     pass
 
 class ObjectApp(object):

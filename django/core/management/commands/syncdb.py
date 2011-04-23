@@ -1,8 +1,8 @@
 from optparse import make_option
 import sys
 
+from django.apps import cache
 from django.conf import settings
-from django.core.apps import cache
 from django.core.management.base import NoArgsCommand
 from django.core.management.color import no_style
 from django.core.management.sql import custom_sql_for_model, emit_post_sync_signal

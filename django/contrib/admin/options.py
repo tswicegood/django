@@ -1,5 +1,5 @@
 from functools import update_wrapper, partial
-from django import forms, template
+from django import apps, forms, template
 from django.forms.formsets import all_valid
 from django.forms.models import (modelform_factory, modelformset_factory,
     inlineformset_factory, BaseInlineFormSet)
@@ -8,7 +8,6 @@ from django.contrib.admin import widgets, helpers
 from django.contrib.admin.util import unquote, flatten_fieldsets, get_deleted_objects, model_format_dict
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_protect
-from django.core.apps import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import models, transaction, router
@@ -932,7 +931,7 @@ class ModelAdmin(BaseModelAdmin):
             'inline_admin_formsets': inline_admin_formsets,
             'errors': helpers.AdminErrorList(form, formsets),
             'root_path': self.admin_site.root_path,
-            'app_label': cache.find_app(opts.app_label)._meta.verbose_name,
+            'app_label': apps.find_app(opts.app_label)._meta.verbose_name,
         }
         context.update(extra_context or {})
         return self.render_change_form(request, context, form_url=form_url, add=True)
@@ -1024,7 +1023,7 @@ class ModelAdmin(BaseModelAdmin):
             'inline_admin_formsets': inline_admin_formsets,
             'errors': helpers.AdminErrorList(form, formsets),
             'root_path': self.admin_site.root_path,
-            'app_label': cache.find_app(opts.app_label)._meta.verbose_name,
+            'app_label': apps.find_app(opts.app_label)._meta.verbose_name,
         }
         context.update(extra_context or {})
         return self.render_change_form(request, context, change=True, obj=obj)
@@ -1164,7 +1163,7 @@ class ModelAdmin(BaseModelAdmin):
             'media': media,
             'has_add_permission': self.has_add_permission(request),
             'root_path': self.admin_site.root_path,
-            'app_label': cache.find_app(app_label)._meta.verbose_name,
+            'app_label': apps.find_app(app_label)._meta.verbose_name,
             'action_form': action_form,
             'actions_on_top': self.actions_on_top,
             'actions_on_bottom': self.actions_on_bottom,
@@ -1229,7 +1228,7 @@ class ModelAdmin(BaseModelAdmin):
             "protected": protected,
             "opts": opts,
             "root_path": self.admin_site.root_path,
-            "app_label": cache.find_app(app_label)._meta.verbose_name,
+            "app_label": apps.find_app(app_label)._meta.verbose_name,
         }
         context.update(extra_context or {})
         context_instance = template.RequestContext(request, current_app=self.admin_site.name)
@@ -1257,7 +1256,7 @@ class ModelAdmin(BaseModelAdmin):
             'module_name': capfirst(force_unicode(opts.verbose_name_plural)),
             'object': obj,
             'root_path': self.admin_site.root_path,
-            'app_label': cache.find_app(app_label)._meta.verbose_name,
+            'app_label': apps.find_app(app_label)._meta.verbose_name,
         }
         context.update(extra_context or {})
         context_instance = template.RequestContext(request, current_app=self.admin_site.name)

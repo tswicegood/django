@@ -7,8 +7,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 
-from django.core.apps.base import App
-from django.core.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
+from django.apps.base import App
+from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
 
 
 class AppCache(object):
@@ -115,7 +115,7 @@ class AppCache(object):
                     if not issubclass(app_class, App):
                         raise ImproperlyConfigured(
                             "App '%s' must be a subclass of "
-                            "'django.core.apps.App'" % app_name)
+                            "'django.apps.App'" % app_name)
                     return app_class
         return App.from_name(app_name)
 
