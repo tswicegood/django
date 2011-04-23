@@ -2,6 +2,7 @@ from optparse import make_option
 
 from django.conf import settings
 from django.db import connections, router, transaction, models, DEFAULT_DB_ALIAS
+from django.core.apps import cache
 from django.core.management import call_command
 from django.core.management.base import NoArgsCommand, CommandError
 from django.core.management.color import no_style

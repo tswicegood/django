@@ -9,6 +9,7 @@ import gettext as gettext_module
 from cStringIO import StringIO
 from threading import local
 
+from django.core.apps import cache
 from django.utils.importlib import import_module
 from django.utils.safestring import mark_safe, SafeData
 
