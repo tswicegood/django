@@ -4,7 +4,7 @@ import threading
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.core.apps import cache, app_prepared, pre_init, post_init
+from django.core.apps import cache, app_prepared, pre_apps_loaded, post_apps_loaded
 
 # remove when tests are integrated into the django testsuite
 settings.configure()
@@ -496,24 +496,24 @@ class SignalTests(AppCacheTestCase):
         self.assertTrue(cache.app_cache_ready())
         self.assertTrue(self.signal_fired)
 
-    def test_pre_init(self):
+    def test_pre_apps_loaded(self):
         """
-        Test the pre_init signal
+        Test the pre_apps_loaded signal
         """
         def callback(sender, **kwargs):
             self.signal_fired = True
-        pre_init.connect(callback)
+        pre_apps_loaded.connect(callback)
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
         self.assertTrue(self.signal_fired)
 
-    def test_post_init(self):
+    def test_post_apps_loaded(self):
         """
-        Test the post_init signal
+        Test the post_apps_loaded signal
         """
         def callback(sender, **kwargs):
             self.signal_fired = True
-        post_init.connect(callback)
+        post_apps_loaded.connect(callback)
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
         self.assertTrue(self.signal_fired)

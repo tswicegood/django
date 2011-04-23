@@ -20,8 +20,8 @@ def get_class_name(module_name):
 DEFAULT_NAMES = ('verbose_name', 'db_prefix', 'models_path')
 
 app_prepared = Signal(providing_args=["app"])
-pre_init = Signal()
-post_init = Signal()
+pre_apps_loaded = Signal()
+post_apps_loaded = Signal(providing_args=["apps"])
 
 
 class AppOptions(object):
@@ -148,8 +148,8 @@ class AppCache(object):
         try:
             if self.loaded:
                 return
-            # send the pre_init signal
-            pre_init.send(sender=self)
+            # send the pre_apps_loaded signal
+            pre_apps_loaded.send(sender=self)
 
             for app_name in settings.INSTALLED_APPS:
                 if app_name in self.handled:
@@ -177,8 +177,8 @@ class AppCache(object):
                                 'The apps "%s" and "%s" have the same db_prefix "%s"'
                                 % (app1, app2, app1._meta.db_prefix))
                 self.loaded = True
-                # send the post_init signal
-                post_init.send(sender=self)
+                # send the post_apps_loaded signal
+                post_apps_loaded.send(sender=self, apps=self.loaded_apps)
         finally:
             self.write_lock.release()
 
