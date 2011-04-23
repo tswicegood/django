@@ -208,7 +208,8 @@ class GetModelsTests(AppCacheTestCase):
         settings.INSTALLED_APPS = ('model_app', 'anothermodel_app',)
         rv = cache.get_models(app_mod=models)
         self.assertTrue(cache.app_cache_ready())
-        self.assertEqual(rv, [models.Person])
+        from model_app.models import Person
+        self.assertEqual(rv, [Person])
 
     def test_include_auto_created(self):
         """
