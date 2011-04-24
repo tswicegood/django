@@ -514,7 +514,11 @@ class SignalTests(AppCacheTestCase):
         """
         Test the post_apps_loaded signal
         """
-        def callback(sender, **kwargs):
+        settings.INSTALLED_APPS = ('model_app', 'anothermodel_app',)
+        def callback(sender, apps, **kwargs):
+            self.assertEqual(len(apps), 2)
+            self.assertEqual(apps[0]._meta.name, 'model_app')
+            self.assertEqual(apps[1]._meta.name, 'anothermodel_app')
             self.signal_fired = True
         post_apps_loaded.connect(callback)
         cache._populate()
