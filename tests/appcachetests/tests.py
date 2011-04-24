@@ -3,7 +3,8 @@ import sys
 import unittest
 import threading
 
-from django.apps import cache, app_loaded, pre_apps_loaded, post_apps_loaded
+from django.apps import cache
+from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
