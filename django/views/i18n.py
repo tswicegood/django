@@ -2,8 +2,8 @@ import os
 import gettext as gettext_module
 
 from django import http
+from django.apps import cache
 from django.conf import settings
-from django.core.apps import cache
 from django.utils import importlib
 from django.utils.translation import check_for_language, activate, to_locale, get_language
 from django.utils.text import javascript_quote
