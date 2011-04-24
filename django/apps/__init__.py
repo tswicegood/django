@@ -2,8 +2,9 @@ from django.apps.base import App
 from django.apps.cache import AppCache
 
 __all__ = (
-    'App', 'find_app', 'get_apps', 'get_app', 'get_models', 'get_model',
-    'register_models', 'load_app', 'app_cache_ready'
+    'App', 'find_app', 'get_apps', 'get_app', 'get_app_errors',
+    'get_models', 'get_model', 'register_models', 'load_app',
+    'app_cache_ready'
 )
 
 cache = AppCache()
