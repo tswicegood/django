@@ -7,6 +7,7 @@ import sys
 import tempfile
 from StringIO import StringIO
 
+from django.apps import cache
 from django.conf import settings
 from django.contrib.staticfiles import finders, storage
 from django.core.exceptions import ImproperlyConfigured
