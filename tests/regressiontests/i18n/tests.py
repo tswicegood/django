@@ -7,6 +7,7 @@ import pickle
 from threading import local
 
 from django.conf import settings
+from django.apps import cache
 from django.template import Template, Context
 from django.utils.formats import (get_format, date_format, time_format,
     localize, localize_input, iter_format_modules, get_format_modules)
@@ -663,10 +664,12 @@ class AppResolutionOrderI18NTests(ResolutionOrderI18NTests):
     def setUp(self):
         self.old_installed_apps = settings.INSTALLED_APPS
         settings.INSTALLED_APPS = ['regressiontests.i18n.resolution'] + list(settings.INSTALLED_APPS)
+        cache._reload()
         super(AppResolutionOrderI18NTests, self).setUp()
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_installed_apps
+        cache._reload()
         super(AppResolutionOrderI18NTests, self).tearDown()
 
     def test_app_translation(self):

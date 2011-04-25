@@ -296,8 +296,8 @@ class GetModelsTests(AppCacheTestCase):
         models = cache.get_models(include_auto_created=True)
         self.assertTrue(cache.app_cache_ready())
         from anothermodel_app.models import Job, Person
-        self.assertEqual(models[0].__name__, 'Person_jobs')
-        self.assertEqual(models[1], Job)
+        self.assertEqual(models[0], Job)
+        self.assertEqual(models[1].__name__, 'Person_jobs')
         self.assertEqual(models[2], Person)
 
 
