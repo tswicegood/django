@@ -63,6 +63,25 @@ class AppCacheTestCase(unittest.TestCase):
         cache.write_lock = threading.RLock()
         cache._get_models_cache = {}
 
+class ReloadTests(AppCacheTestCase):
+    """
+    Tests for the _reload function
+    """
+
+    def test_reload(self):
+        """
+        Test reloading the cache
+        """
+        settings.INSTALLED_APPS = ('model_app',)
+        cache._populate()
+        self.assertEquals(len(cache.loaded_apps), 1)
+        self.assertEquals(cache.loaded_apps[0]._meta.name, 'model_app')
+        settings.INSTALLED_APPS = ('anothermodel_app', 'model_app',)
+        cache._reload()
+        self.assertEquals(len(cache.loaded_apps), 2)
+        self.assertEquals(cache.loaded_apps[0]._meta.name, 'anothermodel_app')
+
+
 class AppCacheReadyTests(AppCacheTestCase):
     """
     Tests for the app_cache_ready function that indicates if the cache

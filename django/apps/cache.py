@@ -1,3 +1,4 @@
+import copy
 import sys
 import os
 import threading
@@ -82,6 +83,15 @@ class AppCache(object):
                 post_apps_loaded.send(sender=self, apps=self.loaded_apps)
         finally:
             self.write_lock.release()
+
+    def _reload(self):
+        """
+        Reloads the cache
+        """
+        self.__class__.__shared_state.update(loaded_apps=[], unbound_models={},
+                loaded=False, handled={}, postponed=[], nesting_level=0,
+                _get_models_cache={})
+        self._populate()
 
     def get_app_class(self, app_name):
         """
