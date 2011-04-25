@@ -58,9 +58,6 @@ class StaticFilesTestCase(TestCase):
             'regressiontests.staticfiles_tests.apps.test',
             'regressiontests.staticfiles_tests.apps.no_label',
         ]
-        # Reload the loaded apps to make sure the
-        # staticfiles related apps are picked up
-        cache._reload()
 
         # Clear the cached default_storage out, this is because when it first
         # gets accessed (by some other test), it evaluates settings.MEDIA_ROOT,
@@ -89,7 +86,6 @@ class StaticFilesTestCase(TestCase):
         settings.INSTALLED_APPS = self.old_installed_apps
         if os.path.exists(self._nonascii_filepath):
             os.unlink(self._nonascii_filepath)
-        cache._reload()
 
     def assertFileContains(self, filepath, text):
         self.assertTrue(text in self._get_file(smart_unicode(filepath)),
