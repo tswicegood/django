@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from django.apps import cache
 from django.conf import settings
 
 if __name__ == '__main__':
@@ -1609,6 +1610,7 @@ class TemplateTagLoading(unittest.TestCase):
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_apps
+        cache._reload()
         sys.path = self.old_path
         template_base.templatetags_modules = self.old_tag_modules
 
@@ -1626,6 +1628,7 @@ class TemplateTagLoading(unittest.TestCase):
         egg_name = '%s/tagsegg.egg' % self.egg_dir
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
+        cache._reload()
         self.assertRaises(template.TemplateSyntaxError, template.Template, ttext)
         try:
             template.Template(ttext)
@@ -1638,6 +1641,7 @@ class TemplateTagLoading(unittest.TestCase):
         egg_name = '%s/tagsegg.egg' % self.egg_dir
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
+        cache._reload()
         t = template.Template(ttext)
 
 
