@@ -19,7 +19,7 @@ def _initialize():
     """
     return {
         # list of loaded app instances
-        '_loaded_apps': [],
+        'loaded_apps': [],
 
         # Mapping of app_labels to a dictionary of model names to model code.
         'unbound_models': SortedDict(),
@@ -30,7 +30,6 @@ def _initialize():
         'postponed': [],
         'nesting_level': 0,
         '_get_models_cache': {},
-        'currently_installed': settings.INSTALLED_APPS,
     }
 
 
@@ -45,12 +44,6 @@ class AppCache(object):
 
     def __init__(self):
         self.__dict__ = self.__shared_state
-
-    @property
-    def loaded_apps(self):
-        if self.currently_installed != settings.INSTALLED_APPS:
-            self._reload()
-        return self._loaded_apps
 
     def _reload(self):
         """
@@ -92,8 +85,8 @@ class AppCache(object):
                         app._meta.models.append(model)
                 # check if there is more than one app with the same
                 # db_prefix attribute
-                for app1 in self._loaded_apps:
-                    for app2 in self._loaded_apps:
+                for app1 in self.loaded_apps:
+                    for app2 in self.loaded_apps:
                         if (app1 != app2 and
                                 app1._meta.db_prefix == app2._meta.db_prefix):
                             raise ImproperlyConfigured(
@@ -101,7 +94,7 @@ class AppCache(object):
                                 % (app1, app2, app1._meta.db_prefix))
                 self.loaded = True
                 # send the post_apps_loaded signal
-                post_apps_loaded.send(sender=self, apps=self._loaded_apps)
+                post_apps_loaded.send(sender=self, apps=self.loaded_apps)
         finally:
             self.write_lock.release()
 
