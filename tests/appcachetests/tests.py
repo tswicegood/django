@@ -451,6 +451,7 @@ class RegisterModelsTests(AppCacheTestCase):
         self.assertFalse(cache.app_cache_ready())
         self.assertEquals(cache.unbound_models['model_app']['person'], Person)
 
+
 class FindAppTests(AppCacheTestCase):
     """Tests for the find_app function"""
 
@@ -467,6 +468,16 @@ class FindAppTests(AppCacheTestCase):
         self.assertTrue(isinstance(app, App))
         self.assertEquals(app.__repr__(), '<App: model_app>')
 
+    def test_seeded_invalid(self):
+        """
+        Test that None is returned if an app could not be found
+        """
+        settings.INSTALLED_APPS = ('model_app',)
+        cache._populate()
+        self.assertTrue(cache.app_cache_ready())
+        app = cache.find_app('model_app_NOTVALID')
+        self.assertEquals(app, None)
+
     def test_unseeded(self):
         """
         Test that the correct app is returned when the cache is unseeded
@@ -477,6 +488,7 @@ class FindAppTests(AppCacheTestCase):
         app = cache.find_app('model_app')
         self.assertEquals(app._meta.name, 'model_app')
         self.assertTrue(isinstance(app, App))
+
 
 class SignalTests(AppCacheTestCase):
     """Tests for the signals"""
