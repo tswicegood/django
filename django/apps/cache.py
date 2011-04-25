@@ -4,6 +4,7 @@ import threading
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 
@@ -23,7 +24,7 @@ class AppCache(object):
         loaded_apps = [],
 
         # Mapping of app_labels to a dictionary of model names to model code.
-        unbound_models = {},
+        unbound_models = SortedDict(),
 
         # -- Everything below here is only used when populating the cache --
         loaded = False,
@@ -297,7 +298,7 @@ class AppCache(object):
         app = self.find_app(app_label)
         for model in models:
             model_name = model._meta.object_name.lower()
-            model_dict = self.unbound_models.setdefault(app_label, {})
+            model_dict = self.unbound_models.setdefault(app_label, SortedDict())
             if model_name in model_dict:
                 # The same model may be imported via different paths (e.g.
                 # appname.models and project.appname.models). We use the source
