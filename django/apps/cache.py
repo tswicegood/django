@@ -10,6 +10,26 @@ from django.utils.module_loading import module_has_submodule
 from django.apps.base import App
 from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
 
+def _initialize():
+    """
+    Returns a dictionary to be used as the initial value of the
+    shared state of the app cache.
+    """
+    return {
+        # list of loaded app instances
+        'loaded_apps': [],
+
+        # Mapping of app_labels to a dictionary of model names to model code.
+        'unbound_models': {},
+
+        # -- Everything below here is only used when populating the cache --
+        'loaded': False,
+        'handled': {},
+        'postponed': [],
+        'nesting_level': 0,
+        '_get_models_cache': {},
+    }
+
 
 class AppCache(object):
     """
@@ -18,24 +38,17 @@ class AppCache(object):
     """
     # Use the Borg pattern to share state between all instances. Details at
     # http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66531.
-    __shared_state = dict(
-        # list of loaded app instances
-        loaded_apps = [],
-
-        # Mapping of app_labels to a dictionary of model names to model code.
-        unbound_models = {},
-
-        # -- Everything below here is only used when populating the cache --
-        loaded = False,
-        handled = {},
-        postponed = [],
-        nesting_level = 0,
-        write_lock = threading.RLock(),
-        _get_models_cache = {},
-    )
+    __shared_state = dict(_initialize(), write_lock=threading.RLock())
 
     def __init__(self):
         self.__dict__ = self.__shared_state
+
+    def _reload(self):
+        """
+        Reloads the cache
+        """
+        self.__class__.__shared_state.update(_initialize())
+        self._populate()
 
     def _populate(self):
         """
@@ -82,15 +95,6 @@ class AppCache(object):
                 post_apps_loaded.send(sender=self, apps=self.loaded_apps)
         finally:
             self.write_lock.release()
-
-    def _reload(self):
-        """
-        Reloads the cache
-        """
-        self.__class__.__shared_state.update(loaded_apps=[], unbound_models={},
-                loaded=False, handled={}, postponed=[], nesting_level=0,
-                _get_models_cache={})
-        self._populate()
 
     def get_app_class(self, app_name):
         """
