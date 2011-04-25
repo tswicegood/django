@@ -288,12 +288,7 @@ class AppCache(object):
         app = self.find_app(app_label)
         for model in models:
             model_name = model._meta.object_name.lower()
-            if self.app_cache_ready() and app:
-                model_dict = dict([(model._meta.object_name.lower(), model)
-                                    for model in app._meta.models])
-            else:
-                model_dict = self.unbound_models.setdefault(app_label, {})
-
+            model_dict = self.unbound_models.setdefault(app_label, {})
             if model_name in model_dict:
                 # The same model may be imported via different paths (e.g.
                 # appname.models and project.appname.models). We use the source
@@ -307,6 +302,5 @@ class AppCache(object):
                     continue
             if self.app_cache_ready() and app:
                 app._meta.models.append(model)
-            else:
-                model_dict[model_name] = model
+            model_dict[model_name] = model
         self._get_models_cache.clear()
