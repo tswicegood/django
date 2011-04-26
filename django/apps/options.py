@@ -1,5 +1,6 @@
 import re
 
+from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
 
 def get_verbose_name(class_name):
@@ -11,7 +12,7 @@ class AppOptions(object):
         self.name = name
         self.meta = meta
         self.errors = []
-        self.models = []
+        self.models = SortedDict()
 
     def contribute_to_class(self, cls, name):
         cls._meta = self
