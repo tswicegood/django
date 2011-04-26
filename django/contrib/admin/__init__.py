@@ -18,7 +18,7 @@ def autodiscover():
     from django.utils.importlib import import_module
     from django.utils.module_loading import module_has_submodule
 
-    for app in cache.apps.values():
+    for app in cache.loaded_apps:
         # Attempt to import the app's admin module.
         try:
             before_import_registry = copy.copy(site._registry)

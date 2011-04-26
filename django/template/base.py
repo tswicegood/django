@@ -980,7 +980,7 @@ def get_templatetags_modules():
     if not templatetags_modules:
         _templatetags_modules = []
         # Populate list once per thread.
-        for app_module in ['django'] + [app._meta.name for app in cache.apps.values()]:
+        for app_module in ['django'] + [app._meta.name for app in cache.loaded_apps]:
             try:
                 templatetag_module = '%s.templatetags' % app_module
                 import_module(templatetag_module)

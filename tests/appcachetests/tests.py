@@ -7,7 +7,6 @@ from django.apps import cache
 from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.datastructures import SortedDict
 
 # remove when tests are integrated into the django testsuite
 settings.configure()
@@ -46,8 +45,8 @@ class AppCacheTestCase(unittest.TestCase):
                 if module in sys.modules:
                     del sys.modules[module]
 
-        for app in cache.apps.values():
-            for model in app._meta.models.itervalues():
+        for app in cache.loaded_apps:
+            for model in app._meta.models:
                 module = model.__module__
                 if module in sys.modules:
                     del sys.modules[module]
@@ -55,7 +54,7 @@ class AppCacheTestCase(unittest.TestCase):
         # we cannot copy() the whole cache.__dict__ in the setUp function
         # because thread.RLock is un(deep)copyable
         cache.unbound_models = {}
-        cache.apps = SortedDict()
+        cache.loaded_apps = []
 
         cache.loaded = False
         cache.handled = {}
@@ -75,12 +74,12 @@ class ReloadTests(AppCacheTestCase):
         """
         settings.INSTALLED_APPS = ('model_app',)
         cache._populate()
-        self.assertEquals(len(cache.apps), 1)
-        self.assertEquals(cache.apps['model_app']._meta.name, 'model_app')
+        self.assertEquals(len(cache.loaded_apps), 1)
+        self.assertEquals(cache.loaded_apps[0]._meta.name, 'model_app')
         settings.INSTALLED_APPS = ('anothermodel_app', 'model_app',)
         cache._reload()
-        self.assertEquals(len(cache.apps), 2)
-        self.assertEquals(cache.apps['anothermodel_app']._meta.name, 'anothermodel_app')
+        self.assertEquals(len(cache.loaded_apps), 2)
+        self.assertEquals(cache.loaded_apps[0]._meta.name, 'anothermodel_app')
 
 
 class AppCacheReadyTests(AppCacheTestCase):
@@ -397,8 +396,8 @@ class LoadAppTests(AppCacheTestCase):
         module is returned
         """
         mod = cache.load_app('model_app')
-        app = cache.apps['model_app']
-        self.assertEqual(len(cache.apps), 1)
+        app = cache.loaded_apps[0]
+        self.assertEqual(len(cache.loaded_apps), 1)
         self.assertEqual(app._meta.name, 'model_app')
         self.assertEqual(app._meta.models_module.__name__, 'model_app.models')
         self.assertEqual(mod.__name__, 'model_app.models')
@@ -410,7 +409,7 @@ class LoadAppTests(AppCacheTestCase):
         """
         from model_app.app import MyApp
         mod = cache.load_app('model_app.app.MyApp', can_postpone=False)
-        app = cache.apps['model_app']
+        app = cache.loaded_apps[0]
         self.assertEqual(app._meta.models_module.__name__, 'model_app.othermodels')
         self.assertTrue(isinstance(app, MyApp))
         self.assertEqual(mod.__name__, 'model_app.othermodels')
@@ -421,8 +420,8 @@ class LoadAppTests(AppCacheTestCase):
         no models provided
         """
         mod = cache.load_app('nomodel_app')
-        app = cache.apps['nomodel_app']
-        self.assertEqual(len(cache.apps), 1)
+        app = cache.loaded_apps[0]
+        self.assertEqual(len(cache.loaded_apps), 1)
         self.assertEqual(app._meta.name, 'nomodel_app')
         self.assertEqual(mod, None)
 
@@ -433,7 +432,7 @@ class LoadAppTests(AppCacheTestCase):
         """
         mod = cache.load_app('model_app')
         mod2 = cache.load_app('model_app')
-        self.assertEqual(len(cache.apps), 1)
+        self.assertEqual(len(cache.loaded_apps), 1)
         self.assertEqual(mod.__name__, 'model_app.models')
         self.assertEqual(mod2.__name__, 'model_app.models')
 
@@ -456,7 +455,7 @@ class RegisterModelsTests(AppCacheTestCase):
         settings.INSTALLED_APPS = ('model_app',)
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
-        app_models = cache.apps['model_app']._meta.models.values()
+        app_models = cache.loaded_apps[0]._meta.models
         self.assertEqual(len(app_models), 1)
         self.assertEqual(app_models[0].__name__, 'Person')
 

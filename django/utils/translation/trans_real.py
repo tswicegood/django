@@ -153,7 +153,7 @@ def translation(language):
                     res.merge(t)
             return res
 
-        for app in reversed(cache.apps.values()):
+        for app in reversed(cache.loaded_apps):
             apppath = os.path.join(os.path.dirname(app._meta.module.__file__), 'locale')
 
             if os.path.isdir(apppath):
