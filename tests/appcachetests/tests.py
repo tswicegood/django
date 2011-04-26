@@ -7,6 +7,7 @@ from django.apps import cache
 from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.datastructures import SortedDict
 
 # remove when tests are integrated into the django testsuite
 settings.configure()
@@ -46,14 +47,14 @@ class AppCacheTestCase(unittest.TestCase):
                     del sys.modules[module]
 
         for app in cache.loaded_apps:
-            for model in app._meta.models:
+            for model in app._meta.models.values():
                 module = model.__module__
                 if module in sys.modules:
                     del sys.modules[module]
 
         # we cannot copy() the whole cache.__dict__ in the setUp function
         # because thread.RLock is un(deep)copyable
-        cache.unbound_models = {}
+        cache.unbound_models = SortedDict()
         cache.loaded_apps = []
 
         cache.loaded = False
@@ -332,16 +333,6 @@ class GetModelTests(AppCacheTestCase):
         self.assertEqual(model, None)
         self.assertTrue(cache.app_cache_ready())
 
-    def test_unseeded_only_installed_valid(self):
-        """
-        Test that the correct model is returned if the cache is unseeded, but
-        the model was registered
-        """
-        from model_app.models import Person
-        model = cache.get_model('model_app', 'Person', seed_cache=False)
-        self.assertEqual(model.__name__, 'Person')
-        self.assertFalse(cache.app_cache_ready())
-
     def test_unseeded_only_installed_invalid(self):
         """
         Test that None is returned if the cache is unseeded and the model
@@ -455,7 +446,7 @@ class RegisterModelsTests(AppCacheTestCase):
         settings.INSTALLED_APPS = ('model_app',)
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
-        app_models = cache.loaded_apps[0]._meta.models
+        app_models = cache.loaded_apps[0]._meta.models.values()
         self.assertEqual(len(app_models), 1)
         self.assertEqual(app_models[0].__name__, 'Person')
 

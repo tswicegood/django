@@ -81,8 +81,7 @@ class AppCache(object):
                     app = self.find_app(app_label)
                     if not app:
                         continue
-                    for model in models.itervalues():
-                        app._meta.models.append(model)
+                    app._meta.models.update(models)
                 # check if there is more than one app with the same
                 # db_prefix attribute
                 for app1 in self.loaded_apps:
@@ -270,7 +269,7 @@ class AppCache(object):
         model_list = []
         for app in app_list:
             model_list.extend(
-                model for model in app._meta.models
+                model for model in app._meta.models.values()
                 if ((not model._deferred or include_deferred) and
                     (not model._meta.auto_created or include_auto_created))
             )
@@ -287,16 +286,14 @@ class AppCache(object):
         """
         if seed_cache:
             self._populate()
-        app = self.find_app(app_label)
-        if only_installed and self.app_cache_ready() and not app:
-            return
-        if only_installed and self.app_cache_ready():
-            for model in app._meta.models:
-                if model_name.lower() == model._meta.object_name.lower():
-                    return model
-        else:
+        if not only_installed:
             return self.unbound_models.get(app_label, {}).get(
                     model_name.lower())
+        else:
+            app = self.find_app(app_label)
+            if not app:
+                return
+            return app._meta.models.get(model_name.lower())
 
     def register_models(self, app_label, *models):
         """
@@ -318,6 +315,6 @@ class AppCache(object):
                 if os.path.splitext(fname1)[0] == os.path.splitext(fname2)[0]:
                     continue
             if self.app_cache_ready() and app:
-                app._meta.models.append(model)
+                app._meta.models[model_name] = model
             model_dict[model_name] = model
         self._get_models_cache.clear()
