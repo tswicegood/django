@@ -286,14 +286,12 @@ class AppCache(object):
         """
         if seed_cache:
             self._populate()
-        if not only_installed:
-            return self.unbound_models.get(app_label, {}).get(
-                    model_name.lower())
-        else:
+        if only_installed:
             app = self.find_app(app_label)
             if not app:
                 return
             return app._meta.models.get(model_name.lower())
+        return self.unbound_models.get(app_label, {}).get(model_name.lower())
 
     def register_models(self, app_label, *models):
         """
