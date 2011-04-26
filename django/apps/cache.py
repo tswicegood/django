@@ -263,6 +263,8 @@ class AppCache(object):
             app = self.find_app(app_label)
             if app:
                 app_list = [app]
+            else:
+                return []
         else:
             app_list = self.loaded_apps
         model_list = []
