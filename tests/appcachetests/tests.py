@@ -332,16 +332,6 @@ class GetModelTests(AppCacheTestCase):
         self.assertEqual(model, None)
         self.assertTrue(cache.app_cache_ready())
 
-    def test_unseeded_only_installed_valid(self):
-        """
-        Test that the correct model is returned if the cache is unseeded, but
-        the model was registered
-        """
-        from model_app.models import Person
-        model = cache.get_model('model_app', 'Person', seed_cache=False)
-        self.assertEqual(model.__name__, 'Person')
-        self.assertFalse(cache.app_cache_ready())
-
     def test_unseeded_only_installed_invalid(self):
         """
         Test that None is returned if the cache is unseeded and the model
