@@ -2,6 +2,8 @@ import re
 
 from django.utils.importlib import import_module
 
+DEFAULT_NAMES = ('verbose_name', 'db_prefix', 'models_path')
+
 def get_verbose_name(class_name):
     new = re.sub('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))', ' \\1', class_name)
     return new.lower().strip()
@@ -30,7 +32,7 @@ class AppOptions(object):
                 # Ignore any private attributes that Django doesn't care about.
                 if name.startswith('_'):
                     del meta_attrs[name]
-            for attr_name in ('verbose_name', 'db_prefix', 'models_path'):
+            for attr_name in DEFAULT_NAMES:
                 if attr_name in meta_attrs:
                     setattr(self, attr_name, meta_attrs.pop(attr_name))
                 elif hasattr(self.meta, attr_name):
