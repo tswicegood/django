@@ -288,6 +288,15 @@ class GetModelsTests(AppCacheTestCase):
         from model_app.models import Person
         self.assertEqual(models, [Person])
 
+    def test_invalid_app_mod(self):
+        """
+        Test that the no models are returned if an app_mod was
+        passed, but the app doesnt exist.
+        """
+        from model_app import models
+        models = cache.get_models(app_mod=models)
+        self.assertEqual(models, [])
+
     def test_include_auto_created(self):
         """
         Test that auto created models are included
