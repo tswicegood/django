@@ -20,7 +20,7 @@ class Loader(BaseLoader):
         """
         if resource_string is not None:
             pkg_name = 'templates/' + template_name
-            for app in cache.loaded_apps:
+            for app in cache.apps.values():
                 try:
                     return (resource_string(app._meta.name, pkg_name).decode(settings.FILE_CHARSET), 'egg:%s:%s' % (app, pkg_name))
                 except:

@@ -187,7 +187,7 @@ def javascript_catalog(request, domain='djangojs', packages=None):
         packages = ['django.conf']
     if isinstance(packages, basestring):
         packages = packages.split('+')
-    apps = [app._meta.name for app in cache.loaded_apps]
+    apps = [app._meta.name for app in cache.apps.values()]
     packages = [p for p in packages if p == 'django.conf' or p in apps]
     default_locale = to_locale(settings.LANGUAGE_CODE)
     locale = to_locale(get_language())

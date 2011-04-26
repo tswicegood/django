@@ -119,7 +119,7 @@ class AppDirectoriesFinder(BaseFinder):
         self.apps = []
         # Mapping of app module paths to storage instances
         self.storages = SortedDict()
-        for app in cache.loaded_apps:
+        for app in cache.apps.values():
             app_storage = self.storage_class(app)
             if os.path.isdir(app_storage.location):
                 self.storages[app] = app_storage

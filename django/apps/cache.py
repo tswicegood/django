@@ -18,8 +18,8 @@ def _initialize():
     shared state of the app cache.
     """
     return {
-        # list of loaded app instances
-        'loaded_apps': [],
+        # Mapping of app_labels to loaded app instances
+        'apps': SortedDict(),
 
         # Mapping of app_labels to a dictionary of model names to model code.
         'unbound_models': SortedDict(),
@@ -85,8 +85,8 @@ class AppCache(object):
                         app._meta.models.append(model)
                 # check if there is more than one app with the same
                 # db_prefix attribute
-                for app1 in self.loaded_apps:
-                    for app2 in self.loaded_apps:
+                for app1 in self.apps.values():
+                    for app2 in self.apps.values():
                         if (app1 != app2 and
                                 app1._meta.db_prefix == app2._meta.db_prefix):
                             raise ImproperlyConfigured(
@@ -94,7 +94,7 @@ class AppCache(object):
                                 % (app1, app2, app1._meta.db_prefix))
                 self.loaded = True
                 # send the post_apps_loaded signal
-                post_apps_loaded.send(sender=self, apps=self.loaded_apps)
+                post_apps_loaded.send(sender=self, apps=self.apps.values())
         finally:
             self.write_lock.release()
 
@@ -154,7 +154,7 @@ class AppCache(object):
         if not app:
             app_class = self.get_app_class(app_name)
             app = app_class()
-            self.loaded_apps.append(app)
+            self.apps[app._meta.label] = app
             # Send the signal that the app has been loaded
             app_loaded.send(sender=app_class, app=app)
 
@@ -189,9 +189,7 @@ class AppCache(object):
         """
         Returns the app instance that matches the given label.
         """
-        for app in self.loaded_apps:
-            if app._meta.label == app_label:
-                return app
+        return self.apps.get(app_label, None)
 
     def app_cache_ready(self):
         """
@@ -207,7 +205,7 @@ class AppCache(object):
         Returns a list of all models modules.
         """
         self._populate()
-        return [app._meta.models_module for app in self.loaded_apps
+        return [app._meta.models_module for app in self.apps.itervalues()
                 if app._meta.models_module]
 
     def get_app(self, app_label, emptyOK=False):
@@ -233,9 +231,9 @@ class AppCache(object):
         """
         self._populate()
         errors = {}
-        for app in self.loaded_apps:
+        for label, app in self.apps.iteritems():
             if app._meta.errors:
-                errors.update({app._meta.label: app._meta.errors})
+                errors.update({label: app._meta.errors})
         return errors
 
     def get_models(self, app_mod=None,
@@ -266,7 +264,7 @@ class AppCache(object):
             else:
                 return []
         else:
-            app_list = self.loaded_apps
+            app_list = self.apps.values()
         model_list = []
         for app in app_list:
             model_list.extend(

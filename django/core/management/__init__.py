@@ -98,7 +98,7 @@ def get_commands():
         # Find the installed apps
         try:
             from django.apps import cache
-            apps = cache.loaded_apps
+            apps = cache.apps.values()
         except (AttributeError, EnvironmentError, ImportError):
             apps = []
 
@@ -316,7 +316,7 @@ class ManagementUtility(object):
                 try:
                     from django.conf import settings
                     # Get the last part of the dotted path as the app name.
-                    options += [(a._meta.label, 0) for app in cache.loaded_apps]
+                    options += [(label, 0) for label, app in cache.apps.items()]
                 except ImportError:
                     # Fail silently if DJANGO_SETTINGS_MODULE isn't set. The
                     # user will find out once they execute the command.
