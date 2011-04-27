@@ -26,16 +26,14 @@ from django.utils.functional import lazy
 from django.core.validators import EMPTY_VALUES
 
 from util import ErrorList
-from widgets import TextInput, PasswordInput, HiddenInput, MultipleHiddenInput, \
-        ClearableFileInput, CheckboxInput, Select, NullBooleanSelect, SelectMultiple, \
-        DateInput, DateTimeInput, TimeInput, SplitDateTimeWidget, SplitHiddenDateTimeWidget, \
-        FILE_INPUT_CONTRADICTION
+from widgets import (TextInput, PasswordInput, HiddenInput,
+    MultipleHiddenInput, ClearableFileInput, CheckboxInput, Select,
+    NullBooleanSelect, SelectMultiple, DateInput, DateTimeInput, TimeInput,
+    SplitDateTimeWidget, SplitHiddenDateTimeWidget, FILE_INPUT_CONTRADICTION)
 
 __all__ = (
     'Field', 'CharField', 'IntegerField',
-    'DEFAULT_DATE_INPUT_FORMATS', 'DateField',
-    'DEFAULT_TIME_INPUT_FORMATS', 'TimeField',
-    'DEFAULT_DATETIME_INPUT_FORMATS', 'DateTimeField', 'TimeField',
+    'DateField', 'TimeField', 'DateTimeField', 'TimeField',
     'RegexField', 'EmailField', 'FileField', 'ImageField', 'URLField',
     'BooleanField', 'NullBooleanField', 'ChoiceField', 'MultipleChoiceField',
     'ComboField', 'MultiValueField', 'FloatField', 'DecimalField',
@@ -43,10 +41,6 @@ __all__ = (
     'TypedChoiceField', 'TypedMultipleChoiceField'
 )
 
-
-DEFAULT_DATE_INPUT_FORMATS = lazy(lambda: en_format('DATE_INPUT_FORMATS'), tuple, list)()
-DEFAULT_TIME_INPUT_FORMATS = lazy(lambda: en_format('TIME_INPUT_FORMATS'), tuple, list)()
-DEFAULT_DATETIME_INPUT_FORMATS = lazy(lambda: en_format('DATETIME_INPUT_FORMATS'), tuple, list)()
 
 class Field(object):
     widget = TextInput # Default widget to use when rendering this type of Field.
@@ -456,6 +450,7 @@ class FileField(Field):
 
     def __init__(self, *args, **kwargs):
         self.max_length = kwargs.pop('max_length', None)
+        self.allow_empty_file = kwargs.pop('allow_empty_file', False)
         super(FileField, self).__init__(*args, **kwargs)
 
     def to_python(self, data):
@@ -474,7 +469,7 @@ class FileField(Field):
             raise ValidationError(self.error_messages['max_length'] % error_values)
         if not file_name:
             raise ValidationError(self.error_messages['invalid'])
-        if not file_size:
+        if not self.allow_empty_file and not file_size:
             raise ValidationError(self.error_messages['empty'])
 
         return data

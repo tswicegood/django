@@ -403,6 +403,7 @@ class QuerySet(object):
                 "Cannot change a query once a slice has been taken."
         obj = self._clone()
         obj.query.set_limits(high=1)
+        obj.query.clear_ordering()
         obj.query.add_ordering('-%s' % latest_by)
         return obj.get()
 
@@ -1384,7 +1385,7 @@ class RawQuerySet(object):
             yield instance
 
     def __repr__(self):
-        return "<RawQuerySet: %r>" % (self.raw_query % self.params)
+        return "<RawQuerySet: %r>" % (self.raw_query % tuple(self.params))
 
     def __getitem__(self, k):
         return list(self)[k]
