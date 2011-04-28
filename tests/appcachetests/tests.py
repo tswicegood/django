@@ -40,7 +40,7 @@ class AppCacheTestCase(unittest.TestCase):
         # To detect which model modules have been imported, we go through
         # all loaded model classes and remove their respective module
         # from sys.modules
-        for app in cache.unbound_models.itervalues():
+        for app in cache.app_models.itervalues():
             for name in app.itervalues():
                 module = name.__module__
                 if module in sys.modules:
@@ -54,7 +54,7 @@ class AppCacheTestCase(unittest.TestCase):
 
         # we cannot copy() the whole cache.__dict__ in the setUp function
         # because thread.RLock is un(deep)copyable
-        cache.unbound_models = SortedDict()
+        cache.app_models = SortedDict()
         cache.loaded_apps = []
 
         cache.loaded = False
@@ -63,6 +63,7 @@ class AppCacheTestCase(unittest.TestCase):
         cache.nesting_level = 0
         cache.write_lock = threading.RLock()
         cache._get_models_cache = {}
+        cache._reload()
 
 class ReloadTests(AppCacheTestCase):
     """
@@ -460,7 +461,7 @@ class RegisterModelsTests(AppCacheTestCase):
         self.assertTrue(cache.app_cache_ready())
         from model_app.models import Person
         cache.register_models('model_app_NONEXISTENT', *(Person,))
-        self.assertEquals(cache.unbound_models['model_app_NONEXISTENT']['person'], Person)
+        self.assertEquals(cache.app_models['model_app_NONEXISTENT']['person'], Person)
 
     def test_unseeded_cache(self):
         """
@@ -468,7 +469,7 @@ class RegisterModelsTests(AppCacheTestCase):
         """
         from model_app.models import Person
         self.assertFalse(cache.app_cache_ready())
-        self.assertEquals(cache.unbound_models['model_app']['person'], Person)
+        self.assertEquals(cache.app_models['model_app']['person'], Person)
 
 
 class FindAppTests(AppCacheTestCase):

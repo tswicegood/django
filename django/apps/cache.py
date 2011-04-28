@@ -22,7 +22,7 @@ def _initialize():
         'loaded_apps': [],
 
         # Mapping of app_labels to a dictionary of model names to model code.
-        'unbound_models': SortedDict(),
+        'app_models': SortedDict(),
 
         # -- Everything below here is only used when populating the cache --
         'loaded': False,
@@ -77,7 +77,7 @@ class AppCache(object):
                 # since the cache is still unseeded at this point
                 # all models have been stored as unbound models.
                 # we need to assign the models to the app instances
-                for app_label, models in self.unbound_models.iteritems():
+                for app_label, models in self.app_models.iteritems():
                     app = self.find_app(app_label)
                     if not app:
                         continue
@@ -291,7 +291,7 @@ class AppCache(object):
             if not app:
                 return
             return app._meta.models.get(model_name.lower())
-        return self.unbound_models.get(app_label, {}).get(model_name.lower())
+        return self.app_models.get(app_label, {}).get(model_name.lower())
 
     def register_models(self, app_label, *models):
         """
@@ -300,7 +300,7 @@ class AppCache(object):
         app = self.find_app(app_label)
         for model in models:
             model_name = model._meta.object_name.lower()
-            model_dict = self.unbound_models.setdefault(app_label, SortedDict())
+            model_dict = self.app_models.setdefault(app_label, SortedDict())
             if model_name in model_dict:
                 # The same model may be imported via different paths (e.g.
                 # appname.models and project.appname.models). We use the source
