@@ -4,6 +4,7 @@ import unittest
 import threading
 
 from django.apps import cache
+from django.apps.cache import _initialize
 from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -31,39 +32,16 @@ class AppCacheTestCase(unittest.TestCase):
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_installed_apps
 
-        # The appcache imports models modules. We need to delete the
-        # imported module from sys.modules after the test has run.
-        # If the module is imported again, the ModelBase.__new__ can
-        # register the models with the appcache anew.
-        # Some models modules import other models modules (for example
-        # django.contrib.auth relies on django.contrib.contenttypes).
-        # To detect which model modules have been imported, we go through
-        # all loaded model classes and remove their respective module
-        # from sys.modules
+        # remove all imported model modules from sys.modules
         for app in cache.app_models.itervalues():
             for name in app.itervalues():
                 module = name.__module__
                 if module in sys.modules:
                     del sys.modules[module]
 
-        for app in cache.loaded_apps:
-            for model in app._meta.models.values():
-                module = model.__module__
-                if module in sys.modules:
-                    del sys.modules[module]
-
-        # we cannot copy() the whole cache.__dict__ in the setUp function
-        # because thread.RLock is un(deep)copyable
-        cache.app_models = SortedDict()
-        cache.loaded_apps = []
-
-        cache.loaded = False
-        cache.handled = {}
-        cache.postponed = []
-        cache.nesting_level = 0
-        cache.write_lock = threading.RLock()
-        cache._get_models_cache = {}
-        cache._reload()
+        # reset all cache attributes to the initial state
+        cache.__dict__.update(dict(_initialize(),
+            write_lock=threading.RLock()))
 
 class ReloadTests(AppCacheTestCase):
     """
