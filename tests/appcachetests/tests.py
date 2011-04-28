@@ -244,7 +244,7 @@ class GetAppErrorsTests(AppCacheTestCase):
 class GetModelsTests(AppCacheTestCase):
     """Tests for the get_models function"""
 
-    def test_get_models(self):
+    def test_installed(self):
         """
         Test that only models from apps are returned that are listed in
         the INSTALLED_APPS setting
@@ -255,6 +255,17 @@ class GetModelsTests(AppCacheTestCase):
         models = cache.get_models()
         self.assertTrue(cache.app_cache_ready())
         self.assertEqual(models, [Person])
+
+    def test_not_only_installed(self):
+        """
+        Test that not only installed models are returned
+        """
+        from anothermodel_app.models import Job, Person, Contact
+        from model_app.models import Person as p2
+        settings.INSTALLED_APPS = ('model_app',)
+        models = cache.get_models(only_installed=False)
+        self.assertTrue(cache.app_cache_ready())
+        self.assertEqual(models, [Job, Person, Contact, p2])
 
     def test_app_mod(self):
         """
@@ -288,6 +299,22 @@ class GetModelsTests(AppCacheTestCase):
         self.assertEqual(models[0], Job)
         self.assertEqual(models[1].__name__, 'Person_jobs')
         self.assertEqual(models[2], Person)
+
+    def test_related_objects_cache(self):
+        """
+        Test that the related objects cache is filled correctly
+        """
+        from anothermodel_app.models import Contact
+        self.assertEqual(Contact._meta.get_all_field_names(),
+                         ['id', 'person'])
+
+    def test_related_many_to_many_cache(self):
+        """
+        Test that the related m2m cache is filled correctly
+        """
+        from anothermodel_app.models import Job
+        self.assertEqual(Job._meta.get_all_field_names(),
+                         ['id', 'name', 'person'])
 
 
 class GetModelTests(AppCacheTestCase):
