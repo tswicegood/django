@@ -26,7 +26,7 @@ def _initialize():
 
         # -- Everything below here is only used when populating the cache --
         'loaded': False,
-        'handled': {},
+        'handled': [],
         'postponed': [],
         'nesting_level': 0,
         '_get_models_cache': {},
@@ -142,7 +142,7 @@ class AppCache(object):
                 the loading will be postponed and tried again when all other
                 modules are loaded.
         """
-        self.handled[app_name] = None
+        self.handled.append(app_name)
         self.nesting_level += 1
 
         # check if an app instance with app_name already exists, if not
