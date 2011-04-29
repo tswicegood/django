@@ -303,7 +303,7 @@ class AppCache(object):
             if not app:
                 return
             return app._meta.models.get(model_name.lower())
-        return self.app_models.get(app_label, {}).get(model_name.lower())
+        return self.app_models.get(app_label, SortedDict()).get(model_name.lower())
 
     def register_models(self, app_label, *models):
         """
