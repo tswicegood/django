@@ -311,7 +311,7 @@ class AppCache(object):
                 # comparing.
                 if os.path.splitext(fname1)[0] == os.path.splitext(fname2)[0]:
                     continue
-            if self.app_cache_ready() and app:
+            if app:
                 app._meta.models[model_name] = model
             model_dict[model_name] = model
         self._get_models_cache.clear()
