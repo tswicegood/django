@@ -74,9 +74,7 @@ class AppCache(object):
             if not self.nesting_level:
                 for app_name in self.postponed:
                     self.load_app(app_name)
-                # since the cache is still unseeded at this point
-                # all models have been stored as unbound models.
-                # we need to assign the models to the app instances
+                # assign the models to the app instances
                 for app_label, models in self.app_models.iteritems():
                     app = self.find_app(app_label)
                     if not app:
