@@ -31,17 +31,7 @@ class AppCacheTestCase(unittest.TestCase):
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_installed_apps
-
-        # remove all imported model modules from sys.modules
-        for app in cache.app_models.itervalues():
-            for name in app.itervalues():
-                module = name.__module__
-                if module in sys.modules:
-                    del sys.modules[module]
-
-        # reset all cache attributes to the initial state
-        cache.__dict__.update(dict(_initialize(),
-            write_lock=threading.RLock()))
+        cache._reset()
 
 class ReloadTests(AppCacheTestCase):
     """
@@ -60,6 +50,17 @@ class ReloadTests(AppCacheTestCase):
         cache._reload()
         self.assertEquals(len(cache.loaded_apps), 2)
         self.assertEquals(cache.loaded_apps[0]._meta.name, 'anothermodel_app')
+
+    def test_reload_register_models(self):
+        """
+        Test that models are registered with the cache again after it
+        was reloaded
+        """
+        settings.INSTALLED_APPS = ('model_app',)
+        cache._populate()
+        self.assertTrue('model_app' in cache.app_models)
+        cache._reload()
+        self.assertTrue('model_app' in cache.app_models)
 
 
 class AppCacheReadyTests(AppCacheTestCase):
@@ -269,24 +270,25 @@ class GetModelsTests(AppCacheTestCase):
 
     def test_app_mod(self):
         """
-        Test that the correct model classes are returned if an
-        app module is specified
+        Test that the correct models are returned if an models module is
+        passed and the app is listed in INSTALLED_APPS
         """
         from model_app import models
+        from model_app.models import Person
         settings.INSTALLED_APPS = ('model_app', 'anothermodel_app',)
         models = cache.get_models(app_mod=models)
         self.assertTrue(cache.app_cache_ready())
-        from model_app.models import Person
         self.assertEqual(models, [Person])
 
-    def test_invalid_app_mod(self):
+    def test_app_mod_not_installed(self):
         """
-        Test that the no models are returned if an app_mod was
-        passed, but the app doesnt exist.
+        Test that the correct models are returned when an models module is
+        passed and the app is _not_ listed in INSTALLED_APPS
         """
         from model_app import models
+        from model_app.models import Person
         models = cache.get_models(app_mod=models)
-        self.assertEqual(models, [])
+        self.assertEqual(models, [Person])
 
     def test_include_auto_created(self):
         """

@@ -45,11 +45,24 @@ class AppCache(object):
     def __init__(self):
         self.__dict__ = self.__shared_state
 
+    def _reset(self):
+        """
+        Resets the cache to its initial (unseeded) state
+        """
+        # remove imported model modules, so ModelBase.__new__ can register
+        # them with the cache again
+        for app, models in self.app_models.iteritems():
+            for model in models.itervalues():
+                module = model.__module__
+                if module in sys.modules:
+                    del sys.modules[module]
+        self.__class__.__shared_state.update(_initialize())
+
     def _reload(self):
         """
         Reloads the cache
         """
-        self.__class__.__shared_state.update(_initialize())
+        self._reset()
         self._populate()
 
     def _populate(self):
