@@ -282,13 +282,13 @@ class GetModelsTests(AppCacheTestCase):
 
     def test_app_mod_not_installed(self):
         """
-        Test that the correct models are returned when an models module is
+        Test that no models are returned when a models module is
         passed and the app is _not_ listed in INSTALLED_APPS
         """
         from model_app import models
         from model_app.models import Person
         models = cache.get_models(app_mod=models)
-        self.assertEqual(models, [Person])
+        self.assertEqual(models, [])
 
     def test_include_auto_created(self):
         """

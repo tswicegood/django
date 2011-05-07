@@ -270,9 +270,12 @@ class AppCache(object):
         except KeyError:
             pass
         self._populate()
-        if app_mod:
+        app_list = []
+        if app_mod and only_installed:
             app_label = app_mod.__name__.split('.')[-2]
-            app_list = [self.app_models.get(app_label, SortedDict())]
+            app = self.find_app(app_label)
+            if app:
+                app_list = [self.app_models.get(app_label, SortedDict())]
         else:
             if only_installed:
                 app_list = [app._meta.models for app in self.loaded_apps]
