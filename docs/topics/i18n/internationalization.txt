@@ -491,12 +491,14 @@ for use within the translation block. Examples::
     This will have {{ myvar }} inside.
     {% endblocktrans %}
 
-If you need to bind more than one expression inside a ``blocktrans`` tag,
-separate the pieces with ``and``::
+You can use multiple expressions inside a single ``blocktrans`` tag::
 
     {% blocktrans with book_t=book|title author_t=author|title %}
     This is {{ book_t }} by {{ author_t }}
     {% endblocktrans %}
+
+.. note:: The previous more verbose format is still supported:
+   ``{% blocktrans with book|title as book_t and author|title as author_t %}``
 
 This tag also provides for pluralization. To use it:
 
@@ -528,9 +530,6 @@ in addition to the counter value, keep in mind that the ``blocktrans``
 construct is internally converted to an ``ungettext`` call. This means the
 same :ref:`notes regarding ungettext variables <pluralization-var-notes>`
 apply.
-
-.. note:: The previous more verbose format is still supported:
-   ``{% blocktrans with book|title as book_t and author|title as author_t %}``
 
 Reverse URL lookups cannot be carried out within the ``blocktrans`` and should
 be retrieved (and stored) beforehand::
@@ -675,9 +674,9 @@ You hook it up like this::
     )
 
 Each string in ``packages`` should be in Python dotted-package syntax (the
-same format as the strings in ``INSTALLED_APPS``) and should refer to a package
-that contains a ``locale`` directory. If you specify multiple packages, all
-those catalogs are merged into one catalog. This is useful if you have
+same format as the strings in :setting:`INSTALLED_APPS`) and should refer to a
+package that contains a ``locale`` directory. If you specify multiple packages,
+all those catalogs are merged into one catalog. This is useful if you have
 JavaScript that uses strings from different applications.
 
 The precedence of translations is such that the packages appearing later in the
@@ -708,8 +707,8 @@ the ones appearing first having higher precedence than the ones appearing
 later.
 
 .. versionchanged:: 1.3
-    Directories listed in ``LOCALE_PATHS`` weren't included in the lookup
-    algorithm until version 1.3.
+    Directories listed in :setting:`LOCALE_PATHS` weren't included in the
+    lookup algorithm until version 1.3.
 
 Using the JavaScript translation catalog
 ----------------------------------------

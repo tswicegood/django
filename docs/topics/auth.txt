@@ -283,7 +283,7 @@ Manager functions
         The :attr:`~django.contrib.auth.models.User.username` and
         :attr:`~django.contrib.auth.models.User.password` are set as given. The
         domain portion of :attr:`~django.contrib.auth.models.User.email` is
-        automatically convered to lowercase, and the returned
+        automatically converted to lowercase, and the returned
         :class:`~django.contrib.auth.models.User` object will have
         :attr:`~models.User.is_active` set to ``True``.
 
@@ -467,8 +467,8 @@ profile" -- for this purpose.
 To make use of this feature, define a model with fields for the
 additional information you'd like to store, or additional methods
 you'd like to have available, and also add a
-:class:`~django.db.models.Field.OneToOneField` from your model to the
-:class:`~django.contrib.auth.models.User` model. This will ensure only
+:class:`~django.db.models.Field.OneToOneField` named ``user`` from your model
+to the :class:`~django.contrib.auth.models.User` model. This will ensure only
 one instance of your model can be created for each
 :class:`~django.contrib.auth.models.User`.
 
@@ -991,25 +991,6 @@ includes a few other useful built-in views located in
           default to :file:`registration/password_reset_done.html` if not
           supplied.
 
-.. function:: redirect_to_login(next[, login_url, redirect_field_name])
-
-    Redirects to the login page, and then back to another URL after a
-    successful login.
-
-    **Required arguments:**
-
-        * ``next``: The URL to redirect to after a successful login.
-
-    **Optional arguments:**
-
-        * ``login_url``: The URL of the login page to redirect to. This will
-          default to :setting:`settings.LOGIN_URL <LOGIN_URL>` if not supplied.
-
-        * ``redirect_field_name``: The name of a ``GET`` field containing the
-          URL to redirect to after log out. Overrides ``next`` if the given
-          ``GET`` parameter is passed.
-
-
 .. function:: password_reset_confirm(request[, uidb36, token, template_name, token_generator, set_password_form, post_reset_redirect])
 
     Presents a form for entering a new password.
@@ -1038,6 +1019,29 @@ includes a few other useful built-in views located in
 
        * ``template_name``: The full name of a template to display the view.
          This will default to :file:`registration/password_reset_complete.html`.
+
+Helper functions
+----------------
+
+.. currentmodule:: django.contrib.auth.views
+
+.. function:: redirect_to_login(next[, login_url, redirect_field_name])
+
+    Redirects to the login page, and then back to another URL after a
+    successful login.
+
+    **Required arguments:**
+
+        * ``next``: The URL to redirect to after a successful login.
+
+    **Optional arguments:**
+
+        * ``login_url``: The URL of the login page to redirect to. This will
+          default to :setting:`settings.LOGIN_URL <LOGIN_URL>` if not supplied.
+
+        * ``redirect_field_name``: The name of a ``GET`` field containing the
+          URL to redirect to after log out. Overrides ``next`` if the given
+          ``GET`` parameter is passed.
 
 Built-in forms
 --------------
@@ -1240,7 +1244,7 @@ To create custom permissions for a given model object, use the ``permissions``
 :ref:`model Meta attribute <meta-options>`.
 
 This example Task model creates three custom permissions, i.e., actions users
-can or cannot do with Task instances, specific to your appication::
+can or cannot do with Task instances, specific to your application::
 
     class Task(models.Model):
         ...

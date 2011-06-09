@@ -246,9 +246,17 @@ ALLOWED_INCLUDE_ROOTS = ()
 # is an admin.
 ADMIN_FOR = ()
 
-# 404s that may be ignored.
-IGNORABLE_404_STARTS = ('/cgi-bin/', '/_vti_bin', '/_vti_inf')
-IGNORABLE_404_ENDS = ('mail.pl', 'mailform.pl', 'mail.cgi', 'mailform.cgi', 'favicon.ico', '.php')
+# List of compiled regular expression objects representing URLs that need not
+# be reported when SEND_BROKEN_LINK_EMAILS is True. Here are a few examples:
+#    import re
+#    IGNORABLE_404_URLS = (
+#        re.compile(r'^/apple-touch-icon.*\.png$'),
+#        re.compile(r'^/favicon.ico$),
+#        re.compile(r'^/robots.txt$),
+#        re.compile(r'^/phpmyadmin/),
+#        re.compile(r'\.(cgi|php|pl)$'),
+#    )
+IGNORABLE_404_URLS = ()
 
 # A secret key for this particular Django installation. Used in secret-key
 # hashing algorithms. Set this in your settings, or Django will complain
@@ -398,6 +406,9 @@ URL_VALIDATOR_USER_AGENT = "Django/%s (http://www.djangoproject.com)" % get_vers
 DEFAULT_TABLESPACE = ''
 DEFAULT_INDEX_TABLESPACE = ''
 
+# Default X-Frame-Options header value
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 ##############
 # MIDDLEWARE #
 ##############
@@ -453,22 +464,6 @@ COMMENTS_ALLOW_PROFANITIES = False
 # 'hasNoProfanities' validator. All of these should be in lowercase.
 PROFANITIES_LIST = ()
 
-# The group ID that designates which users are banned.
-# Set to None if you're not using it.
-COMMENTS_BANNED_USERS_GROUP = None
-
-# The group ID that designates which users can moderate comments.
-# Set to None if you're not using it.
-COMMENTS_MODERATORS_GROUP = None
-
-# The group ID that designates the users whose comments should be emailed to MANAGERS.
-# Set to None if you're not using it.
-COMMENTS_SKETCHY_USERS_GROUP = None
-
-# The system will email MANAGERS the first COMMENTS_FIRST_FEW comments by each
-# user. Set this to 0 if you want to disable it.
-COMMENTS_FIRST_FEW = 0
-
 ##################
 # AUTHENTICATION #
 ##################
@@ -484,6 +479,12 @@ LOGIN_REDIRECT_URL = '/accounts/profile/'
 # The number of days a password reset link is valid for
 PASSWORD_RESET_TIMEOUT_DAYS = 3
 
+###########
+# SIGNING #
+###########
+
+SIGNING_BACKEND = 'django.core.signing.TimestampSigner'
+
 ########
 # CSRF #
 ########
@@ -492,9 +493,11 @@ PASSWORD_RESET_TIMEOUT_DAYS = 3
 # rejected by the CSRF middleware.
 CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
 
-# Name and domain for CSRF cookie.
+# Settings for CSRF cookie.
 CSRF_COOKIE_NAME = 'csrftoken'
 CSRF_COOKIE_DOMAIN = None
+CSRF_COOKIE_PATH = '/'
+CSRF_COOKIE_SECURE = False
 
 ############
 # MESSAGES #
@@ -533,6 +536,10 @@ LOGGING = {
         },
     }
 }
+
+# Default exception reporter filter class used in case none has been
+# specifically assigned to the HttpRequest instance.
+DEFAULT_EXCEPTION_REPORTER_FILTER = 'django.views.debug.SafeExceptionReporterFilter'
 
 ###########
 # TESTING #

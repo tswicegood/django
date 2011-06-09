@@ -7,6 +7,7 @@ from django.contrib.admin.views.main import (ALL_VAR, EMPTY_CHANGELIST_VALUE,
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils import formats
+from django.utils.datastructures import SortedDict
 from django.utils.html import escape, conditional_escape
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
@@ -19,6 +20,7 @@ register = Library()
 
 DOT = '.'
 
+@register.simple_tag
 def paginator_number(cl,i):
     """
     Generates an individual page index link in a paginated list.
@@ -29,8 +31,8 @@ def paginator_number(cl,i):
         return mark_safe(u'<span class="this-page">%d</span> ' % (i+1))
     else:
         return mark_safe(u'<a href="%s"%s>%d</a> ' % (escape(cl.get_query_string({PAGE_VAR: i})), (i == cl.paginator.num_pages-1 and ' class="end"' or ''), i+1))
-paginator_number = register.simple_tag(paginator_number)
 
+@register.inclusion_tag('admin/pagination.html')
 def pagination(cl):
     """
     Generates the series of links to the pages in a paginated list.
@@ -75,55 +77,89 @@ def pagination(cl):
         'ALL_VAR': ALL_VAR,
         '1': 1,
     }
-pagination = register.inclusion_tag('admin/pagination.html')(pagination)
 
 def result_headers(cl):
     """
     Generates the list column headers.
     """
-    lookup_opts = cl.lookup_opts
-
+    # We need to know the 'ordering field' that corresponds to each
+    # item in list_display, and we need other info, so do a pre-pass
+    # on list_display
+    ordering_field_columns = cl.get_ordering_field_columns()
     for i, field_name in enumerate(cl.list_display):
-        header, attr = label_for_field(field_name, cl.model,
+        admin_order_field = None
+        text, attr = label_for_field(field_name, cl.model,
             model_admin = cl.model_admin,
             return_attr = True
         )
         if attr:
+            # Potentially not sortable
+
             # if the field is the action checkbox: no sorting and special class
             if field_name == 'action_checkbox':
                 yield {
-                    "text": header,
+                    "text": text,
                     "class_attrib": mark_safe(' class="action-checkbox-column"')
                 }
                 continue
 
-            # It is a non-field, but perhaps one that is sortable
             admin_order_field = getattr(attr, "admin_order_field", None)
             if not admin_order_field:
-                yield {"text": header}
+                # Not sortable
+                yield {"text": text}
                 continue
 
-            # So this _is_ a sortable non-field.  Go to the yield
-            # after the else clause.
-        else:
-            admin_order_field = None
-
+        # OK, it is sortable if we got this far
         th_classes = []
+        order_type = ''
         new_order_type = 'asc'
-        if field_name == cl.order_field or admin_order_field == cl.order_field:
-            th_classes.append('sorted %sending' % cl.order_type.lower())
-            new_order_type = {'asc': 'desc', 'desc': 'asc'}[cl.order_type.lower()]
+        sort_pos = 0
+        # Is it currently being sorted on?
+        if i in ordering_field_columns:
+            order_type = ordering_field_columns.get(i).lower()
+            sort_pos = ordering_field_columns.keys().index(i) + 1
+            th_classes.append('sorted %sending' % order_type)
+            new_order_type = {'asc': 'desc', 'desc': 'asc'}[order_type]
+
+        # build new ordering param
+        o_list_primary = [] # URL for making this field the primary sort
+        o_list_remove  = [] # URL for removing this field from sort
+        o_list_toggle  = [] # URL for toggling order type for this field
+        make_qs_param = lambda t, n: ('-' if t == 'desc' else '') + str(n)
+
+        for j, ot in ordering_field_columns.items():
+            if j == i: # Same column
+                param = make_qs_param(new_order_type, j)
+                # We want clicking on this header to bring the ordering to the
+                # front
+                o_list_primary.insert(0, param)
+                o_list_toggle.append(param)
+                # o_list_remove - omit
+            else:
+                param = make_qs_param(ot, j)
+                o_list_primary.append(param)
+                o_list_toggle.append(param)
+                o_list_remove.append(param)
+
+        if i not in ordering_field_columns:
+            o_list_primary.insert(0, make_qs_param(new_order_type, i))
+
 
         yield {
-            "text": header,
+            "text": text,
             "sortable": True,
-            "url": cl.get_query_string({ORDER_VAR: i, ORDER_TYPE_VAR: new_order_type}),
+            "ascending": order_type == "asc",
+            "sort_pos": sort_pos,
+            "url_primary": cl.get_query_string({ORDER_VAR: '.'.join(o_list_primary)}),
+            "url_remove": cl.get_query_string({ORDER_VAR: '.'.join(o_list_remove)}),
+            "url_toggle": cl.get_query_string({ORDER_VAR: '.'.join(o_list_toggle)}),
             "class_attrib": mark_safe(th_classes and ' class="%s"' % ' '.join(th_classes) or '')
         }
 
 def _boolean_icon(field_val):
     BOOLEAN_MAPPING = {True: 'yes', False: 'no', None: 'unknown'}
-    return mark_safe(u'<img src="%simg/admin/icon-%s.gif" alt="%s" />' % (settings.ADMIN_MEDIA_PREFIX, BOOLEAN_MAPPING[field_val], field_val))
+    return mark_safe(u'<img src="%simg/admin/icon-%s.gif" alt="%s" />' %
+        (settings.ADMIN_MEDIA_PREFIX, BOOLEAN_MAPPING[field_val], field_val))
 
 def items_for_result(cl, result, form):
     """
@@ -222,16 +258,22 @@ def result_hidden_fields(cl):
             if form[cl.model._meta.pk.name].is_hidden:
                 yield mark_safe(force_unicode(form[cl.model._meta.pk.name]))
 
+@register.inclusion_tag("admin/change_list_results.html")
 def result_list(cl):
     """
     Displays the headers and data list together
     """
+    headers = list(result_headers(cl))
+    for h in headers:
+        # Sorting in templates depends on sort_pos attribute
+        h.setdefault('sort_pos', 0)
     return {'cl': cl,
             'result_hidden_fields': list(result_hidden_fields(cl)),
-            'result_headers': list(result_headers(cl)),
+            'result_headers': headers,
+            'reset_sorting_url': cl.get_query_string(remove=[ORDER_VAR]),
             'results': list(results(cl))}
-result_list = register.inclusion_tag("admin/change_list_results.html")(result_list)
 
+@register.inclusion_tag('admin/date_hierarchy.html')
 def date_hierarchy(cl):
     """
     Displays the date hierarchy for date drill-down functionality.
@@ -303,8 +345,8 @@ def date_hierarchy(cl):
                     'title': str(year.year),
                 } for year in years]
             }
-date_hierarchy = register.inclusion_tag('admin/date_hierarchy.html')(date_hierarchy)
 
+@register.inclusion_tag('admin/search_form.html')
 def search_form(cl):
     """
     Displays a search form for searching the list.
@@ -314,12 +356,12 @@ def search_form(cl):
         'show_result_count': cl.result_count != cl.full_result_count,
         'search_var': SEARCH_VAR
     }
-search_form = register.inclusion_tag('admin/search_form.html')(search_form)
 
+@register.inclusion_tag('admin/filter.html')
 def admin_list_filter(cl, spec):
-    return {'title': spec.title(), 'choices' : list(spec.choices(cl))}
-admin_list_filter = register.inclusion_tag('admin/filter.html')(admin_list_filter)
+    return {'title': spec.title, 'choices' : list(spec.choices(cl))}
 
+@register.inclusion_tag('admin/actions.html', takes_context=True)
 def admin_actions(context):
     """
     Track the number of times the action field has been rendered on the page,
@@ -327,4 +369,3 @@ def admin_actions(context):
     """
     context['action_index'] = context.get('action_index', -1) + 1
     return context
-admin_actions = register.inclusion_tag("admin/actions.html", takes_context=True)(admin_actions)

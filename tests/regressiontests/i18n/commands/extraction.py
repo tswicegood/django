@@ -31,11 +31,13 @@ class ExtractorTests(TestCase):
     def assertMsgId(self, msgid, s, use_quotes=True):
         if use_quotes:
             msgid = '"%s"' % msgid
+        msgid = re.escape(msgid)
         return self.assertTrue(re.search('^msgid %s' % msgid, s, re.MULTILINE))
 
     def assertNotMsgId(self, msgid, s, use_quotes=True):
         if use_quotes:
             msgid = '"%s"' % msgid
+        msgid = re.escape(msgid)
         return self.assertTrue(not re.search('^msgid %s' % msgid, s, re.MULTILINE))
 
 
@@ -73,7 +75,7 @@ class BasicExtractorTests(ExtractorTests):
         self.assertTrue(os.path.exists(self.PO_FILE))
         po_contents = open(self.PO_FILE, 'r').read()
         self.assertMsgId('I think that 100%% is more that 50%% of anything.', po_contents)
-        self.assertMsgId('I think that 100%% is more that 50%% of %\(obj\)s.', po_contents)
+        self.assertMsgId('I think that 100%% is more that 50%% of %(obj)s.', po_contents)
 
     def test_extraction_error(self):
         os.chdir(self.test_dir)
@@ -82,7 +84,10 @@ class BasicExtractorTests(ExtractorTests):
         try:
             management.call_command('makemessages', locale=LOCALE, verbosity=0)
         except SyntaxError, e:
-            self.assertEqual(str(e), 'Translation blocks must not include other block tags: blocktrans (file templates/template_with_error.html, line 3)')
+            self.assertRegexpMatches(
+                str(e),
+                r'Translation blocks must not include other block tags: blocktrans \(file templates[/\\]template_with_error\.html, line 3\)'
+            )
         finally:
             os.remove('./templates/template_with_error.html')
             os.remove('./templates/template_with_error.html.py') # Waiting for #8536 to be fixed
@@ -99,13 +104,24 @@ class JavascriptExtractorTests(ExtractorTests):
         po_contents = open(self.PO_FILE, 'r').read()
         self.assertMsgId('This literal should be included.', po_contents)
         self.assertMsgId('This one as well.', po_contents)
-
+        self.assertMsgId(r'He said, \"hello\".', po_contents)
+        self.assertMsgId("okkkk", po_contents)
+        self.assertMsgId("TEXT", po_contents)
+        self.assertMsgId("It's at http://example.com", po_contents)
+        self.assertMsgId("String", po_contents)
+        self.assertMsgId("/* but this one will be too */ 'cause there is no way of telling...", po_contents)
+        self.assertMsgId("foo", po_contents)
+        self.assertMsgId("bar", po_contents)
+        self.assertMsgId("baz", po_contents)
+        self.assertMsgId("quz", po_contents)
+        self.assertMsgId("foobar", po_contents)
 
 class IgnoredExtractorTests(ExtractorTests):
 
     def test_ignore_option(self):
         os.chdir(self.test_dir)
-        management.call_command('makemessages', locale=LOCALE, verbosity=0, ignore_patterns=['ignore_dir/*'])
+        pattern1 = os.path.join('ignore_dir', '*')
+        management.call_command('makemessages', locale=LOCALE, verbosity=0, ignore_patterns=[pattern1])
         self.assertTrue(os.path.exists(self.PO_FILE))
         po_contents = open(self.PO_FILE, 'r').read()
         self.assertMsgId('This literal should be included.', po_contents)

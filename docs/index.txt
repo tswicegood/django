@@ -167,10 +167,12 @@ Other batteries included
     * :doc:`Admin site <ref/contrib/admin/index>` | :doc:`Admin actions <ref/contrib/admin/actions>` | :doc:`Admin documentation generator<ref/contrib/admin/admindocs>`
     * :doc:`Authentication <topics/auth>`
     * :doc:`Cache system <topics/cache>`
-    * :doc:`Conditional content processing <topics/conditional-view-processing>`
+    * :doc:`Clickjacking protection <ref/clickjacking>`
     * :doc:`Comments <ref/contrib/comments/index>` | :doc:`Moderation <ref/contrib/comments/moderation>` | :doc:`Custom comments <ref/contrib/comments/custom>`
+    * :doc:`Conditional content processing <topics/conditional-view-processing>`
     * :doc:`Content types <ref/contrib/contenttypes>`
     * :doc:`Cross Site Request Forgery protection <ref/contrib/csrf>`
+    * :doc:`Cryptographic signing <topics/signing>`
     * :doc:`Databrowse <ref/contrib/databrowse>`
     * :doc:`E-mail (sending) <topics/email>`
     * :doc:`Flatpages <ref/contrib/flatpages>`
@@ -199,7 +201,7 @@ The Django open-source project
 ==============================
 
     * **Community:**
-      :doc:`How to get involved <internals/contributing>` |
+      :doc:`How to get involved <internals/contributing/index>` |
       :doc:`The release process <internals/release-process>` |
       :doc:`Team of committers <internals/committers>` |
       :doc:`The Django source code repository <internals/svn>`
@@ -208,7 +210,7 @@ The Django open-source project
       :doc:`Overview <misc/design-philosophies>`
 
     * **Documentation:**
-      :doc:`About this documentation <internals/documentation>`
+      :doc:`About this documentation <internals/contributing/writing-documentation>`
 
     * **Third-party distributions:**
       :doc:`Overview <misc/distributions>`

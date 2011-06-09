@@ -1,3 +1,4 @@
+from localflavor import AssertFieldOutputTests
 from localflavor.ar import ARLocalFlavorTests
 from localflavor.at import ATLocalFlavorTests
 from localflavor.au import AULocalFlavorTests
@@ -12,6 +13,7 @@ from localflavor.de import DELocalFlavorTests
 from localflavor.es import ESLocalFlavorTests
 from localflavor.fi import FILocalFlavorTests
 from localflavor.fr import FRLocalFlavorTests
+from localflavor.gb import GBLocalFlavorTests
 from localflavor.generic import GenericLocalFlavorTests
 from localflavor.hr import HRLocalFlavorTests
 from localflavor.id import IDLocalFlavorTests
@@ -29,7 +31,6 @@ from localflavor.ru import RULocalFlavorTests
 from localflavor.se import SELocalFlavorTests
 from localflavor.sk import SKLocalFlavorTests
 from localflavor.tr import TRLocalFlavorTests
-from localflavor.uk import UKLocalFlavorTests
 from localflavor.us import USLocalFlavorTests
 from localflavor.uy import UYLocalFlavorTests
 from localflavor.za import ZALocalFlavorTests

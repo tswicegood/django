@@ -396,7 +396,12 @@ def modelform_factory(model, form=ModelForm, fields=None, exclude=None,
         'formfield_callback': formfield_callback
     }
 
-    return ModelFormMetaclass(class_name, (form,), form_class_attrs)
+    form_metaclass = ModelFormMetaclass
+
+    if issubclass(form, BaseModelForm) and hasattr(form, '__metaclass__'):
+        form_metaclass = form.__metaclass__
+
+    return form_metaclass(class_name, (form,), form_class_attrs)
 
 
 # ModelFormSets ##############################################################
@@ -701,11 +706,10 @@ class BaseInlineFormSet(BaseModelFormSet):
         setattr(form.instance, self.fk.get_attname(), self.instance.pk)
         return form
 
-    #@classmethod
+    @classmethod
     def get_default_prefix(cls):
         from django.db.models.fields.related import RelatedObject
         return RelatedObject(cls.fk.rel.to, cls.model, cls.fk).get_accessor_name().replace('+','')
-    get_default_prefix = classmethod(get_default_prefix)
 
     def save_new(self, form, commit=True):
         # Use commit=False so we can assign the parent key afterwards, then

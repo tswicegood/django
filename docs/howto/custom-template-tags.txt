@@ -105,23 +105,6 @@ your function. Example::
         "Converts a string into all lowercase"
         return value.lower()
 
-Template filters that expect strings
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you're writing a template filter that only expects a string as the first
-argument, you should use the decorator ``stringfilter``. This will
-convert an object to its string value before being passed to your function::
-
-    from django.template.defaultfilters import stringfilter
-
-    @stringfilter
-    def lower(value):
-        return value.lower()
-
-This way, you'll be able to pass, say, an integer to this filter, and it
-won't cause an ``AttributeError`` (because integers don't have ``lower()``
-methods).
-
 Registering custom filters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -140,17 +123,36 @@ The ``Library.filter()`` method takes two arguments:
 You can use ``register.filter()`` as a decorator instead::
 
     @register.filter(name='cut')
-    @stringfilter
     def cut(value, arg):
         return value.replace(arg, '')
+
+    @register.filter
+    def lower(value):
+        return value.lower()
+
+If you leave off the ``name`` argument, as in the second example above, Django
+will use the function's name as the filter name.
+
+Template filters that expect strings
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you're writing a template filter that only expects a string as the first
+argument, you should use the decorator ``stringfilter``. This will
+convert an object to its string value before being passed to your function::
+
+    from django import template
+    from django.template.defaultfilters import stringfilter
+
+    register = template.Library()
 
     @register.filter
     @stringfilter
     def lower(value):
         return value.lower()
 
-If you leave off the ``name`` argument, as in the second example above, Django
-will use the function's name as the filter name.
+This way, you'll be able to pass, say, an integer to this filter, and it
+won't cause an ``AttributeError`` (because integers don't have ``lower()``
+methods).
 
 Filters and auto-escaping
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -624,16 +626,18 @@ for example::
 Variable resolution will throw a ``VariableDoesNotExist`` exception if it cannot
 resolve the string passed to it in the current context of the page.
 
+.. _howto-custom-template-tags-simple-tags:
+
 Shortcut for simple tags
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Many template tags take a number of arguments -- strings or a template variables
+Many template tags take a number of arguments -- strings or template variables
 -- and return a string after doing some processing based solely on
-the input argument and some external information. For example, the
+the input arguments and some external information. For example, the
 ``current_time`` tag we wrote above is of this variety: we give it a format
 string, it returns the time as a string.
 
-To ease the creation of the types of tags, Django provides a helper function,
+To ease the creation of these types of tags, Django provides a helper function,
 ``simple_tag``. This function, which is a method of
 ``django.template.Library``, takes a function that accepts any number of
 arguments, wraps it in a ``render`` function and the other necessary bits
@@ -681,7 +685,70 @@ Or, using decorator syntax::
         return your_get_current_time_method(timezone, format_string)
 
 For more information on how the ``takes_context`` option works, see the section
-on `inclusion tags`_.
+on :ref:`inclusion tags<howto-custom-template-tags-inclusion-tags>`.
+
+.. _howto-custom-template-tags-assignment-tags:
+
+Assignment tags
+~~~~~~~~~~~~~~~
+
+.. versionadded:: 1.4
+
+Another common type of template tag is the type that fetches some data and
+stores it in a context variable. To ease the creation of this type of tags,
+Django provides a helper function, ``assignment_tag``. This function works
+the same way as :ref:`simple_tag<howto-custom-template-tags-simple-tags>`,
+except that it stores the tag's result in a specified context variable instead
+of directly outputting it.
+
+Our earlier ``current_time`` function could thus be written like this:
+
+.. code-block:: python
+
+    def get_current_time(format_string):
+        return datetime.datetime.now().strftime(format_string)
+
+    register.assignment_tag(get_current_time)
+
+The decorator syntax also works:
+
+.. code-block:: python
+
+    @register.assignment_tag
+    def get_current_time(format_string):
+        ...
+
+You may then store the result in a template variable using the ``as`` argument
+followed by the variable name, and output it yourself where you see fit:
+
+.. code-block:: html+django
+
+    {% get_current_time "%Y-%m-%d %I:%M %p" as the_time %}
+    <p>The time is {{ the_time }}.</p>
+
+If your template tag needs to access the current context, you can use the
+``takes_context`` argument when registering your tag:
+
+.. code-block:: python
+
+    # The first argument *must* be called "context" here.
+    def get_current_time(context, format_string):
+        timezone = context['timezone']
+        return your_get_current_time_method(timezone, format_string)
+
+    register.assignment_tag(takes_context=True)(get_current_time)
+
+Or, using decorator syntax:
+
+.. code-block:: python
+
+    @register.assignment_tag(takes_context=True)
+    def get_current_time(context, format_string):
+        timezone = context['timezone']
+        return your_get_current_time_method(timezone, format_string)
+
+For more information on how the ``takes_context`` option works, see the section
+on :ref:`inclusion tags<howto-custom-template-tags-inclusion-tags>`.
 
 .. _howto-custom-template-tags-inclusion-tags:
 
@@ -829,7 +896,7 @@ Here's how you'd use this new version of the tag:
 .. admonition:: Variable scope in context
 
     Any variable set in the context will only be available in the same ``block``
-    of the template in which it was assigned. This behaviour is intentional;
+    of the template in which it was assigned. This behavior is intentional;
     it provides a scope for variables so that they don't conflict with
     context in other blocks.
 

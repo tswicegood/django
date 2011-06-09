@@ -1,13 +1,16 @@
-from django.contrib.admin.filterspecs import FilterSpec
-from django.contrib.admin.options import IncorrectLookupParameters
-from django.contrib.admin.util import quote, get_fields_from_path
+import operator
+
 from django.core.exceptions import SuspiciousOperation
 from django.core.paginator import InvalidPage
 from django.db import models
+from django.utils.datastructures import SortedDict
 from django.utils.encoding import force_unicode, smart_str
 from django.utils.translation import ugettext, ugettext_lazy
 from django.utils.http import urlencode
-import operator
+
+from django.contrib.admin import FieldListFilter
+from django.contrib.admin.options import IncorrectLookupParameters
+from django.contrib.admin.util import quote, get_fields_from_path
 
 # The system will display a "Show all" link on the change list only if the
 # total result count is less than or equal to this setting.
@@ -23,6 +26,9 @@ TO_FIELD_VAR = 't'
 IS_POPUP_VAR = 'pop'
 ERROR_FLAG = 'e'
 
+IGNORED_PARAMS = (
+    ALL_VAR, ORDER_VAR, ORDER_TYPE_VAR, SEARCH_VAR, IS_POPUP_VAR, TO_FIELD_VAR)
+
 # Text to display within change-list table cells if the value is blank.
 EMPTY_CHANGELIST_VALUE = ugettext_lazy('(None)')
 
@@ -36,7 +42,9 @@ def field_needs_distinct(field):
 
 
 class ChangeList(object):
-    def __init__(self, request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields, list_select_related, list_per_page, list_editable, model_admin):
+    def __init__(self, request, model, list_display, list_display_links,
+            list_filter, date_hierarchy, search_fields, list_select_related,
+            list_per_page, list_editable, model_admin):
         self.model = model
         self.opts = model._meta
         self.lookup_opts = self.opts
@@ -68,22 +76,41 @@ class ChangeList(object):
             self.list_editable = ()
         else:
             self.list_editable = list_editable
-        self.order_field, self.order_type = self.get_ordering()
+        self.ordering = self.get_ordering()
         self.query = request.GET.get(SEARCH_VAR, '')
-        self.query_set = self.get_query_set()
+        self.query_set = self.get_query_set(request)
         self.get_results(request)
-        self.title = (self.is_popup and ugettext('Select %s') % force_unicode(self.opts.verbose_name) or ugettext('Select %s to change') % force_unicode(self.opts.verbose_name))
-        self.filter_specs, self.has_filters = self.get_filters(request)
+        if self.is_popup:
+            title = ugettext('Select %s')
+        else:
+            title = ugettext('Select %s to change')
+        self.title = title % force_unicode(self.opts.verbose_name)
         self.pk_attname = self.lookup_opts.pk.attname
 
-    def get_filters(self, request):
+    def get_filters(self, request, use_distinct=False):
         filter_specs = []
+        cleaned_params, use_distinct = self.get_lookup_params(use_distinct)
         if self.list_filter:
-            for filter_name in self.list_filter:
-                field = get_fields_from_path(self.model, filter_name)[-1]
-                spec = FilterSpec.create(field, request, self.params,
-                                         self.model, self.model_admin,
-                                         field_path=filter_name)
+            for list_filer in self.list_filter:
+                if callable(list_filer):
+                    # This is simply a custom list filter class.
+                    spec = list_filer(request, cleaned_params,
+                        self.model, self.model_admin)
+                else:
+                    field_path = None
+                    if isinstance(list_filer, (tuple, list)):
+                        # This is a custom FieldListFilter class for a given field.
+                        field, field_list_filter_class = list_filer
+                    else:
+                        # This is simply a field name, so use the default
+                        # FieldListFilter class that has been registered for
+                        # the type of the given field.
+                        field, field_list_filter_class = list_filer, FieldListFilter.create
+                    if not isinstance(field, models.Field):
+                        field_path = field
+                        field = get_fields_from_path(self.model, field_path)[-1]
+                    spec = field_list_filter_class(field, request, cleaned_params,
+                        self.model, self.model_admin, field_path=field_path)
                 if spec and spec.has_output():
                     filter_specs.append(spec)
         return filter_specs, bool(filter_specs)
@@ -137,52 +164,101 @@ class ChangeList(object):
         self.multi_page = multi_page
         self.paginator = paginator
 
+    def _get_default_ordering(self):
+        ordering = []
+        if self.model_admin.ordering:
+            ordering = self.model_admin.ordering
+        elif self.lookup_opts.ordering:
+            ordering = self.lookup_opts.ordering
+        return ordering
+
     def get_ordering(self):
-        lookup_opts, params = self.lookup_opts, self.params
+        params = self.params
         # For ordering, first check the "ordering" parameter in the admin
-        # options, then check the object's default ordering. If neither of
-        # those exist, order descending by ID by default. Finally, look for
-        # manually-specified ordering from the query string.
-        ordering = self.model_admin.ordering or lookup_opts.ordering or ['-' + lookup_opts.pk.name]
+        # options, then check the object's default ordering. Finally, a
+        # manually-specified ordering from the query string overrides anything.
+        ordering = self._get_default_ordering()
 
-        if ordering[0].startswith('-'):
-            order_field, order_type = ordering[0][1:], 'desc'
-        else:
-            order_field, order_type = ordering[0], 'asc'
         if ORDER_VAR in params:
-            try:
-                field_name = self.list_display[int(params[ORDER_VAR])]
+            # Clear ordering and used params
+            ordering = []
+            order_params = params[ORDER_VAR].split('.')
+            for p in order_params:
                 try:
-                    f = lookup_opts.get_field(field_name)
-                except models.FieldDoesNotExist:
-                    # See whether field_name is a name of a non-field
-                    # that allows sorting.
+                    none, pfx, idx = p.rpartition('-')
+                    field_name = self.list_display[int(idx)]
                     try:
-                        if callable(field_name):
-                            attr = field_name
-                        elif hasattr(self.model_admin, field_name):
-                            attr = getattr(self.model_admin, field_name)
-                        else:
-                            attr = getattr(self.model, field_name)
-                        order_field = attr.admin_order_field
-                    except AttributeError:
-                        pass
+                        f = self.lookup_opts.get_field(field_name)
+                    except models.FieldDoesNotExist:
+                        # See whether field_name is a name of a non-field
+                        # that allows sorting.
+                        try:
+                            if callable(field_name):
+                                attr = field_name
+                            elif hasattr(self.model_admin, field_name):
+                                attr = getattr(self.model_admin, field_name)
+                            else:
+                                attr = getattr(self.model, field_name)
+                            field_name = attr.admin_order_field
+                        except AttributeError:
+                            continue # No 'admin_order_field', skip it
+                    else:
+                        field_name = f.name
+
+                    ordering.append(pfx + field_name)
+
+                except (IndexError, ValueError):
+                    continue # Invalid ordering specified, skip it.
+
+        return ordering
+
+    def get_ordering_field_columns(self):
+        # Returns a SortedDict of ordering field column numbers and asc/desc
+
+        # We must cope with more than one column having the same underlying sort
+        # field, so we base things on column numbers.
+        ordering = self._get_default_ordering()
+        ordering_fields = SortedDict()
+        if ORDER_VAR not in self.params:
+            # for ordering specified on ModelAdmin or model Meta, we don't know
+            # the right column numbers absolutely, because there might be more
+            # than one column associated with that ordering, so we guess.
+            for f in ordering:
+                if f.startswith('-'):
+                    f = f[1:]
+                    order_type = 'desc'
                 else:
-                    order_field = f.name
-            except (IndexError, ValueError):
-                pass # Invalid ordering specified. Just use the default.
-        if ORDER_TYPE_VAR in params and params[ORDER_TYPE_VAR] in ('asc', 'desc'):
-            order_type = params[ORDER_TYPE_VAR]
-        return order_field, order_type
+                    order_type = 'asc'
+                i = None
+                try:
+                    # Search for simply field name first
+                    i = self.list_display.index(f)
+                except ValueError:
+                    # No match, but their might be a match if we take into account
+                    # 'admin_order_field'
+                    for j, attr in enumerate(self.list_display):
+                        if getattr(attr, 'admin_order_field', '') == f:
+                            i = j
+                            break
+                if i is not None:
+                    ordering_fields[i] = order_type
+        else:
+            for p in self.params[ORDER_VAR].split('.'):
+                none, pfx, idx = p.rpartition('-')
+                try:
+                    idx = int(idx)
+                except ValueError:
+                    continue # skip it
+                ordering_fields[idx] = 'desc' if pfx == '-' else 'asc'
+        return ordering_fields
 
-    def get_query_set(self):
-        use_distinct = False
-
-        qs = self.root_query_set
+    def get_lookup_params(self, use_distinct=False):
         lookup_params = self.params.copy() # a dictionary of the query string
-        for i in (ALL_VAR, ORDER_VAR, ORDER_TYPE_VAR, SEARCH_VAR, IS_POPUP_VAR, TO_FIELD_VAR):
-            if i in lookup_params:
-                del lookup_params[i]
+
+        for ignored in IGNORED_PARAMS:
+            if ignored in lookup_params:
+                del lookup_params[ignored]
+
         for key, value in lookup_params.items():
             if not isinstance(key, str):
                 # 'key' will be used as a keyword argument later, so Python
@@ -195,10 +271,11 @@ class ChangeList(object):
                 # instance
                 field_name = key.split('__', 1)[0]
                 try:
-                    f = self.lookup_opts.get_field_by_name(field_name)[0]
+                    field = self.lookup_opts.get_field_by_name(field_name)[0]
+                    use_distinct = field_needs_distinct(field)
                 except models.FieldDoesNotExist:
-                    raise IncorrectLookupParameters
-                use_distinct = field_needs_distinct(f)
+                    # It might be a custom NonFieldFilter
+                    pass
 
             # if key ends with __in, split parameter into separate values
             if key.endswith('__in'):
@@ -214,11 +291,28 @@ class ChangeList(object):
                 lookup_params[key] = value
 
             if not self.model_admin.lookup_allowed(key, value):
-                raise SuspiciousOperation(
-                    "Filtering by %s not allowed" % key
-                )
+                raise SuspiciousOperation("Filtering by %s not allowed" % key)
 
-        # Apply lookup parameters from the query string.
+        return lookup_params, use_distinct
+
+    def get_query_set(self, request):
+        lookup_params, use_distinct = self.get_lookup_params(use_distinct=False)
+        self.filter_specs, self.has_filters = self.get_filters(request, use_distinct)
+
+        # Let every list filter modify the qs and params to its liking
+        qs = self.root_query_set
+        for filter_spec in self.filter_specs:
+            new_qs = filter_spec.queryset(request, qs)
+            if new_qs is not None:
+                qs = new_qs
+                for param in filter_spec.used_params():
+                    try:
+                        del lookup_params[param]
+                    except KeyError:
+                        pass
+
+        # Apply the remaining lookup parameters from the query string (i.e.
+        # those that haven't already been processed by the filters).
         try:
             qs = qs.filter(**lookup_params)
         # Naked except! Because we don't have any other way of validating "params".
@@ -226,8 +320,8 @@ class ChangeList(object):
         # values are not in the correct type, so we might get FieldError, ValueError,
         # ValicationError, or ? from a custom field that raises yet something else
         # when handed impossible data.
-        except:
-            raise IncorrectLookupParameters
+        except Exception, e:
+            raise IncorrectLookupParameters(e)
 
         # Use select_related() if one of the list_display options is a field
         # with a relationship and the provided queryset doesn't already have
@@ -238,17 +332,17 @@ class ChangeList(object):
             else:
                 for field_name in self.list_display:
                     try:
-                        f = self.lookup_opts.get_field(field_name)
+                        field = self.lookup_opts.get_field(field_name)
                     except models.FieldDoesNotExist:
                         pass
                     else:
-                        if isinstance(f.rel, models.ManyToOneRel):
+                        if isinstance(field.rel, models.ManyToOneRel):
                             qs = qs.select_related()
                             break
 
         # Set ordering.
-        if self.order_field:
-            qs = qs.order_by('%s%s' % ((self.order_type == 'desc' and '-' or ''), self.order_field))
+        if self.ordering:
+            qs = qs.order_by(*self.ordering)
 
         # Apply keyword searches.
         def construct_search(field_name):

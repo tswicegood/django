@@ -576,9 +576,7 @@ class ModelAdmin(BaseModelAdmin):
         # get_action might have returned None, so filter any of those out.
         actions = filter(None, actions)
 
-        # Convert the actions into a SortedDict keyed by name
-        # and sorted by description.
-        actions.sort(key=lambda k: k[2].lower())
+        # Convert the actions into a SortedDict keyed by name.
         actions = SortedDict([
             (name, (func, name, desc))
             for func, name, desc in actions
@@ -626,6 +624,13 @@ class ModelAdmin(BaseModelAdmin):
         else:
             description = capfirst(action.replace('_', ' '))
         return func, action, description
+
+    def get_list_display(self, request):
+        """
+        Return a sequence containing the fields to be displayed on the
+        changelist.
+        """
+        return self.list_display
 
     def construct_change_message(self, request, form, formsets):
         """
@@ -1055,7 +1060,7 @@ class ModelAdmin(BaseModelAdmin):
         actions = self.get_actions(request)
 
         # Remove action checkboxes if there aren't any actions available.
-        list_display = list(self.list_display)
+        list_display = list(self.get_list_display(request))
         if not actions:
             try:
                 list_display.remove('action_checkbox')
@@ -1091,7 +1096,7 @@ class ModelAdmin(BaseModelAdmin):
         if (actions and request.method == 'POST' and
                 'index' in request.POST and '_save' not in request.POST):
             if selected:
-                response = self.response_action(request, queryset=cl.get_query_set())
+                response = self.response_action(request, queryset=cl.get_query_set(request))
                 if response:
                     return response
                 else:
@@ -1107,7 +1112,7 @@ class ModelAdmin(BaseModelAdmin):
                 helpers.ACTION_CHECKBOX_NAME in request.POST and
                 'index' not in request.POST and '_save' not in request.POST):
             if selected:
-                response = self.response_action(request, queryset=cl.get_query_set())
+                response = self.response_action(request, queryset=cl.get_query_set(request))
                 if response:
                     return response
                 else:

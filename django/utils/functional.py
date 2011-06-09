@@ -1,3 +1,4 @@
+import operator
 from functools import wraps, update_wrapper
 
 
@@ -17,6 +18,7 @@ def memoize(func, cache, num_args):
 
     Only the first num_args are considered when creating the key.
     """
+    @wraps(func)
     def wrapper(*args):
         mem_args = args[:num_args]
         if mem_args in cache:
@@ -24,7 +26,7 @@ def memoize(func, cache, num_args):
         result = func(*args)
         cache[mem_args] = result
         return result
-    return wraps(func)(wrapper)
+    return wrapper
 
 class Promise(object):
     """
@@ -67,14 +69,15 @@ def lazy(func, *resultclasses):
             cls.__dispatch = {}
             for resultclass in resultclasses:
                 cls.__dispatch[resultclass] = {}
-                for (k, v) in resultclass.__dict__.items():
-                    # All __promise__ return the same wrapper method, but they
-                    # also do setup, inserting the method into the dispatch
-                    # dict.
-                    meth = cls.__promise__(resultclass, k, v)
-                    if hasattr(cls, k):
-                        continue
-                    setattr(cls, k, meth)
+                for type_ in reversed(resultclass.mro()):
+                    for (k, v) in type_.__dict__.items():
+                        # All __promise__ return the same wrapper method, but they
+                        # also do setup, inserting the method into the dispatch
+                        # dict.
+                        meth = cls.__promise__(resultclass, k, v)
+                        if hasattr(cls, k):
+                            continue
+                        setattr(cls, k, meth)
             cls._delegate_str = str in resultclasses
             cls._delegate_unicode = unicode in resultclasses
             assert not (cls._delegate_str and cls._delegate_unicode), "Cannot call lazy() with both str and unicode return types."
@@ -135,11 +138,12 @@ def lazy(func, *resultclasses):
             memo[id(self)] = self
             return self
 
+    @wraps(func)
     def __wrapper__(*args, **kw):
         # Creates the proxy object, instead of the actual value.
         return __proxy__(args, kw)
 
-    return wraps(func)(__wrapper__)
+    return __wrapper__
 
 def _lazy_proxy_unpickle(func, args, kwargs, *resultclasses):
     return lazy(func, *resultclasses)(*args, **kwargs)
@@ -151,6 +155,7 @@ def allow_lazy(func, *resultclasses):
     immediately, otherwise a __proxy__ is returned that will evaluate the
     function when needed.
     """
+    @wraps(func)
     def wrapper(*args, **kwargs):
         for arg in list(args) + kwargs.values():
             if isinstance(arg, Promise):
@@ -158,7 +163,15 @@ def allow_lazy(func, *resultclasses):
         else:
             return func(*args, **kwargs)
         return lazy(func, *resultclasses)(*args, **kwargs)
-    return wraps(func)(wrapper)
+    return wrapper
+
+empty = object()
+def new_method_proxy(func):
+    def inner(self, *args):
+        if self._wrapped is empty:
+            self._setup()
+        return func(self._wrapped, *args)
+    return inner
 
 class LazyObject(object):
     """
@@ -169,26 +182,23 @@ class LazyObject(object):
     instantiation. If you don't need to do that, use SimpleLazyObject.
     """
     def __init__(self):
-        self._wrapped = None
+        self._wrapped = empty
 
-    def __getattr__(self, name):
-        if self._wrapped is None:
-            self._setup()
-        return getattr(self._wrapped, name)
+    __getattr__ = new_method_proxy(getattr)
 
     def __setattr__(self, name, value):
         if name == "_wrapped":
             # Assign to __dict__ to avoid infinite __setattr__ loops.
             self.__dict__["_wrapped"] = value
         else:
-            if self._wrapped is None:
+            if self._wrapped is empty:
                 self._setup()
             setattr(self._wrapped, name, value)
 
     def __delattr__(self, name):
         if name == "_wrapped":
             raise TypeError("can't delete _wrapped.")
-        if self._wrapped is None:
+        if self._wrapped is empty:
             self._setup()
         delattr(self._wrapped, name)
 
@@ -200,11 +210,8 @@ class LazyObject(object):
 
     # introspection support:
     __members__ = property(lambda self: self.__dir__())
+    __dir__ = new_method_proxy(dir)
 
-    def __dir__(self):
-        if self._wrapped is None:
-            self._setup()
-        return  dir(self._wrapped)
 
 class SimpleLazyObject(LazyObject):
     """
@@ -223,20 +230,16 @@ class SimpleLazyObject(LazyObject):
         value.
         """
         self.__dict__['_setupfunc'] = func
-        # For some reason, we have to inline LazyObject.__init__ here to avoid
-        # recursion
-        self._wrapped = None
+        super(SimpleLazyObject, self).__init__()
 
-    def __str__(self):
-        if self._wrapped is None: self._setup()
-        return str(self._wrapped)
+    def _setup(self):
+        self._wrapped = self._setupfunc()
 
-    def __unicode__(self):
-        if self._wrapped is None: self._setup()
-        return unicode(self._wrapped)
+    __str__ = new_method_proxy(str)
+    __unicode__ = new_method_proxy(unicode)
 
     def __deepcopy__(self, memo):
-        if self._wrapped is None:
+        if self._wrapped is empty:
             # We have to use SimpleLazyObject, not self.__class__, because the
             # latter is proxied.
             result = SimpleLazyObject(self._setupfunc)
@@ -248,18 +251,28 @@ class SimpleLazyObject(LazyObject):
 
     # Need to pretend to be the wrapped class, for the sake of objects that care
     # about this (especially in equality tests)
-    def __get_class(self):
-        if self._wrapped is None: self._setup()
-        return self._wrapped.__class__
-    __class__ = property(__get_class)
+    __class__ = property(new_method_proxy(operator.attrgetter("__class__")))
+    __eq__ = new_method_proxy(operator.eq)
+    __hash__ = new_method_proxy(hash)
+    __nonzero__ = new_method_proxy(bool)
 
-    def __eq__(self, other):
-        if self._wrapped is None: self._setup()
-        return self._wrapped == other
 
-    def __hash__(self):
-        if self._wrapped is None: self._setup()
-        return hash(self._wrapped)
-
-    def _setup(self):
-        self._wrapped = self._setupfunc()
+class lazy_property(property):
+    """
+    A property that works with subclasses by wrapping the decorated
+    functions of the base class.
+    """
+    def __new__(cls, fget=None, fset=None, fdel=None, doc=None):
+        if fget is not None:
+            @wraps(fget)
+            def fget(instance, instance_type=None, name=fget.__name__):
+                return getattr(instance, name)()
+        if fset is not None:
+            @wraps(fset)
+            def fset(instance, value, name=fset.__name__):
+                return getattr(instance, name)(value)
+        if fdel is not None:
+            @wraps(fdel)
+            def fdel(instance, name=fdel.__name__):
+                return getattr(instance, name)()
+        return property(fget, fset, fdel, doc)

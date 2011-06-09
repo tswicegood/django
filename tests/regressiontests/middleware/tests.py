@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import re
+
 from django.conf import settings
+from django.core import mail
 from django.http import HttpRequest
+from django.http import HttpResponse
+from django.middleware.clickjacking import XFrameOptionsMiddleware
 from django.middleware.common import CommonMiddleware
 from django.middleware.http import ConditionalGetMiddleware
 from django.test import TestCase
@@ -9,12 +14,16 @@ from django.test import TestCase
 
 class CommonMiddlewareTest(TestCase):
     def setUp(self):
-        self.slash = settings.APPEND_SLASH
-        self.www = settings.PREPEND_WWW
+        self.append_slash = settings.APPEND_SLASH
+        self.prepend_www = settings.PREPEND_WWW
+        self.ignorable_404_urls = settings.IGNORABLE_404_URLS
+        self.send_broken_email_links = settings.SEND_BROKEN_LINK_EMAILS
 
     def tearDown(self):
-        settings.APPEND_SLASH = self.slash
-        settings.PREPEND_WWW = self.www
+        settings.APPEND_SLASH = self.append_slash
+        settings.PREPEND_WWW = self.prepend_www
+        settings.IGNORABLE_404_URLS = self.ignorable_404_urls
+        settings.SEND_BROKEN_LINK_EMAILS = self.send_broken_email_links
 
     def _get_request(self, path):
         request = HttpRequest()
@@ -249,6 +258,36 @@ class CommonMiddlewareTest(TestCase):
       self.assertEqual(r['Location'],
                         'http://www.testserver/middleware/customurlconf/slash/')
 
+    # Tests for the 404 error reporting via email
+
+    def test_404_error_reporting(self):
+        settings.IGNORABLE_404_URLS = (re.compile(r'foo'),)
+        settings.SEND_BROKEN_LINK_EMAILS = True
+        request = self._get_request('regular_url/that/does/not/exist')
+        request.META['HTTP_REFERER'] = '/another/url/'
+        response = self.client.get(request.path)
+        CommonMiddleware().process_response(request, response)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Broken', mail.outbox[0].subject)
+
+    def test_404_error_reporting_no_referer(self):
+        settings.IGNORABLE_404_URLS = (re.compile(r'foo'),)
+        settings.SEND_BROKEN_LINK_EMAILS = True
+        request = self._get_request('regular_url/that/does/not/exist')
+        response = self.client.get(request.path)
+        CommonMiddleware().process_response(request, response)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_404_error_reporting_ignored_url(self):
+        settings.IGNORABLE_404_URLS = (re.compile(r'foo'),)
+        settings.SEND_BROKEN_LINK_EMAILS = True
+        request = self._get_request('foo_url/that/does/not/exist/either')
+        request.META['HTTP_REFERER'] = '/another/url/'
+        response = self.client.get(request.path)
+        CommonMiddleware().process_response(request, response)
+        self.assertEqual(len(mail.outbox), 0)
+
+
 class ConditionalGetMiddlewareTest(TestCase):
     urls = 'regressiontests.middleware.cond_get_urls'
     def setUp(self):
@@ -334,3 +373,125 @@ class ConditionalGetMiddlewareTest(TestCase):
         self.resp['Last-Modified'] = 'Sat, 12 Feb 2011 17:41:44 GMT'
         self.resp = ConditionalGetMiddleware().process_response(self.req, self.resp)
         self.assertEqual(self.resp.status_code, 200)
+
+
+class XFrameOptionsMiddlewareTest(TestCase):
+    """
+    Tests for the X-Frame-Options clickjacking prevention middleware.
+    """
+    def setUp(self):
+        self.x_frame_options = settings.X_FRAME_OPTIONS
+
+    def tearDown(self):
+        settings.X_FRAME_OPTIONS = self.x_frame_options
+
+    def test_same_origin(self):
+        """
+        Tests that the X_FRAME_OPTIONS setting can be set to SAMEORIGIN to
+        have the middleware use that value for the HTTP header.
+        """
+        settings.X_FRAME_OPTIONS = 'SAMEORIGIN'
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       HttpResponse())
+        self.assertEqual(r['X-Frame-Options'], 'SAMEORIGIN')
+
+        settings.X_FRAME_OPTIONS = 'sameorigin'
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       HttpResponse())
+        self.assertEqual(r['X-Frame-Options'], 'SAMEORIGIN')
+
+    def test_deny(self):
+        """
+        Tests that the X_FRAME_OPTIONS setting can be set to DENY to
+        have the middleware use that value for the HTTP header.
+        """
+        settings.X_FRAME_OPTIONS = 'DENY'
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       HttpResponse())
+        self.assertEqual(r['X-Frame-Options'], 'DENY')
+
+        settings.X_FRAME_OPTIONS = 'deny'
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       HttpResponse())
+        self.assertEqual(r['X-Frame-Options'], 'DENY')
+
+    def test_defaults_sameorigin(self):
+        """
+        Tests that if the X_FRAME_OPTIONS setting is not set then it defaults
+        to SAMEORIGIN.
+        """
+        del settings.X_FRAME_OPTIONS
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       HttpResponse())
+        self.assertEqual(r['X-Frame-Options'], 'SAMEORIGIN')
+
+    def test_dont_set_if_set(self):
+        """
+        Tests that if the X-Frame-Options header is already set then the
+        middleware does not attempt to override it.
+        """
+        settings.X_FRAME_OPTIONS = 'DENY'
+        response = HttpResponse()
+        response['X-Frame-Options'] = 'SAMEORIGIN'
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       response)
+        self.assertEqual(r['X-Frame-Options'], 'SAMEORIGIN')
+
+        settings.X_FRAME_OPTIONS = 'SAMEORIGIN'
+        response = HttpResponse()
+        response['X-Frame-Options'] = 'DENY'
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       response)
+        self.assertEqual(r['X-Frame-Options'], 'DENY')
+
+    def test_response_exempt(self):
+        """
+        Tests that if the response has a xframe_options_exempt attribute set
+        to False then it still sets the header, but if it's set to True then
+        it does not.
+        """
+        settings.X_FRAME_OPTIONS = 'SAMEORIGIN'
+        response = HttpResponse()
+        response.xframe_options_exempt = False
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       response)
+        self.assertEqual(r['X-Frame-Options'], 'SAMEORIGIN')
+
+        response = HttpResponse()
+        response.xframe_options_exempt = True
+        r = XFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       response)
+        self.assertEqual(r.get('X-Frame-Options', None), None)
+
+    def test_is_extendable(self):
+        """
+        Tests that the XFrameOptionsMiddleware method that determines the
+        X-Frame-Options header value can be overridden based on something in
+        the request or response.
+        """
+        class OtherXFrameOptionsMiddleware(XFrameOptionsMiddleware):
+            # This is just an example for testing purposes...
+            def get_xframe_options_value(self, request, response):
+                if getattr(request, 'sameorigin', False):
+                    return 'SAMEORIGIN'
+                if getattr(response, 'sameorigin', False):
+                    return 'SAMEORIGIN'
+                return 'DENY'
+
+        settings.X_FRAME_OPTIONS = 'DENY'
+        response = HttpResponse()
+        response.sameorigin = True
+        r = OtherXFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                            response)
+        self.assertEqual(r['X-Frame-Options'], 'SAMEORIGIN')
+
+        request = HttpRequest()
+        request.sameorigin = True
+        r = OtherXFrameOptionsMiddleware().process_response(request,
+                                                            HttpResponse())
+        self.assertEqual(r['X-Frame-Options'], 'SAMEORIGIN')
+
+        settings.X_FRAME_OPTIONS = 'SAMEORIGIN'
+        r = OtherXFrameOptionsMiddleware().process_response(HttpRequest(),
+                                                       HttpResponse())
+        self.assertEqual(r['X-Frame-Options'], 'DENY')

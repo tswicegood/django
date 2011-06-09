@@ -26,6 +26,7 @@ from regressiontests.forms.localflavortests import (
     ESLocalFlavorTests,
     FILocalFlavorTests,
     FRLocalFlavorTests,
+    GBLocalFlavorTests,
     GenericLocalFlavorTests,
     HRLocalFlavorTests,
     IDLocalFlavorTests,
@@ -43,8 +44,8 @@ from regressiontests.forms.localflavortests import (
     SELocalFlavorTests,
     SKLocalFlavorTests,
     TRLocalFlavorTests,
-    UKLocalFlavorTests,
     USLocalFlavorTests,
     UYLocalFlavorTests,
-    ZALocalFlavorTests
+    ZALocalFlavorTests,
+    AssertFieldOutputTests,
 )
