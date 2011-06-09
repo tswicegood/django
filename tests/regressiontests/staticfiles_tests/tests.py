@@ -78,7 +78,6 @@ class StaticFilesTestCase(TestCase):
         settings.STATICFILES_FINDERS = self.old_staticfiles_finders
         if os.path.exists(self._nonascii_filepath):
             os.unlink(self._nonascii_filepath)
-        cache._reload()
 
     def assertFileContains(self, filepath, text):
         self.assertTrue(text in self._get_file(smart_unicode(filepath)),
