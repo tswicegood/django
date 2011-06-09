@@ -402,6 +402,15 @@ class LoadAppTests(AppCacheTestCase):
         self.assertEqual(app._meta.models_module.__name__, 'model_app.models')
         self.assertEqual(mod.__name__, 'model_app.models')
 
+    def test_with_inheritance(self):
+        from model_app.app import MyApp
+        mod = cache.load_app('model_app.app.MyOtherApp')
+        app = cache.loaded_apps[0]
+        self.assertEqual(app._meta.name, 'model_app')
+        self.assertEqual(app._meta.models_module.__name__, 'model_app.models')
+        self.assertEqual(mod.__name__, 'model_app.models')
+        self.assertEqual(app.__class__.__bases__, (MyApp,))
+
     def test_with_custom_models(self):
         """
         Test that custom models are imported correctly, if the App specifies
