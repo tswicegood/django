@@ -407,9 +407,38 @@ class LoadAppTests(AppCacheTestCase):
         mod = cache.load_app('model_app.app.MyOtherApp')
         app = cache.loaded_apps[0]
         self.assertEqual(app._meta.name, 'model_app')
+        self.assertEqual(app._meta.models_module.__name__, 'model_app.othermodels')
+        self.assertEqual(mod.__name__, 'model_app.othermodels')
+        self.assertEqual(app.__class__.__bases__, (MyApp,))
+        self.assertEqual(app._meta.models_path, 'model_app.othermodels')
+        self.assertEqual(app._meta.db_prefix, 'nomodel_app')
+        self.assertEqual(app._meta.verbose_name, 'model_app')
+
+    def test_with_multiple_inheritance(self):
+        from model_app.app import MyOtherApp
+        from django.apps import App
+        mod = cache.load_app('model_app.app.MySecondApp')
+        app = cache.loaded_apps[0]
+        self.assertEqual(app._meta.name, 'model_app')
         self.assertEqual(app._meta.models_module.__name__, 'model_app.models')
         self.assertEqual(mod.__name__, 'model_app.models')
-        self.assertEqual(app.__class__.__bases__, (MyApp,))
+        self.assertEqual(app.__class__.__bases__, (MyOtherApp,))
+        self.assertEqual(app._meta.models_path, 'model_app.models')
+        self.assertEqual(app._meta.db_prefix, 'nomodel_app')
+        self.assertEqual(app._meta.verbose_name, 'model_app')
+
+    def test_with_complicated_inheritance(self):
+        from model_app.app import MySecondApp, YetAnotherApp
+        from django.apps import App
+        mod = cache.load_app('model_app.app.MyThirdApp')
+        app = cache.loaded_apps[0]
+        self.assertEqual(app._meta.name, 'model_app')
+        self.assertEqual(app._meta.models_module.__name__, 'model_app.yetanother')
+        self.assertEqual(mod.__name__, 'model_app.yetanother')
+        self.assertEqual(app.__class__.__bases__, (MySecondApp, YetAnotherApp,))
+        self.assertEqual(app._meta.models_path, 'model_app.yetanother')
+        self.assertEqual(app._meta.db_prefix, 'nomodel_app')
+        self.assertEqual(app._meta.verbose_name, 'model_app')
 
     def test_with_custom_models(self):
         """

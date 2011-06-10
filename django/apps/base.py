@@ -32,16 +32,6 @@ class AppBase(type):
             app_module = sys.modules[new_class.__module__]
             app_name = app_module.__name__.rsplit('.', 1)[0]
         new_class.add_to_class('_meta', AppOptions(app_name, meta))
-        # for base in parents:
-        #     original_base = base
-        #     if not hasattr(base, '_meta'):
-        #         # Things without _meta aren't functional models, so they're
-        #         # uninteresting parents.
-        #         continue
-        #     for attr_name in DEFAULT_NAMES:
-        #         if (hasattr(base._meta, attr_name) and
-        #                 not hasattr(new_class._meta, attr_name)):
-        #             setattr(new_class._meta, attr_name, getattr(base._meta, attr_name))
         return new_class
 
     def add_to_class(cls, name, value):
