@@ -620,17 +620,22 @@ class ResolutionOrderI18NTests(TestCase):
         self.assertTrue(msgstr in result, ("The string '%s' isn't in the "
             "translation of '%s'; the actual result is '%s'." % (msgstr, msgid, result)))
 
+class MockedApp(object):
+    class Meta:
+        def get_path(self):
+            result = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resolution')
+            return result
+    _meta = Meta()
+
 class AppResolutionOrderI18NTests(ResolutionOrderI18NTests):
 
     def setUp(self):
-        self.old_installed_apps = settings.INSTALLED_APPS
-        settings.INSTALLED_APPS = ['regressiontests.i18n.resolution'] + list(settings.INSTALLED_APPS)
-        cache._reload()
+        self.old_loaded_apps = cache.loaded_apps
+        cache.loaded_apps = [MockedApp()] + cache.loaded_apps
         super(AppResolutionOrderI18NTests, self).setUp()
 
     def tearDown(self):
-        settings.INSTALLED_APPS = self.old_installed_apps
-        cache._reload()
+        cache.loaded_apps = self.old_loaded_apps
         super(AppResolutionOrderI18NTests, self).tearDown()
 
     def test_app_translation(self):

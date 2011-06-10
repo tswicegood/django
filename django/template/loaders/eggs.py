@@ -1,4 +1,5 @@
 # Wrapper for loading templates from eggs via pkg_resources.resource_string.
+from django.apps import cache
 
 try:
     from pkg_resources import resource_string
@@ -22,8 +23,8 @@ class Loader(BaseLoader):
             pkg_name = 'templates/' + template_name
             for app in cache.loaded_apps:
                 try:
-                    return (resource_string(app._meta.name, pkg_name).decode(settings.FILE_CHARSET), 'egg:%s:%s' % (app, pkg_name))
-                except:
+                    return (resource_string(app._meta.name, pkg_name).decode(settings.FILE_CHARSET), 'egg:%s:%s' % (app._meta.name, pkg_name))
+                except Exception, e:
                     pass
         raise TemplateDoesNotExist(template_name)
 

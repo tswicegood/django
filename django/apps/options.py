@@ -1,4 +1,5 @@
 import re
+import os
 
 from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
@@ -44,3 +45,6 @@ class AppOptions(object):
                 raise TypeError("'class Meta' got invalid attribute(s): %s"
                                 % ','.join(meta_attrs.keys()))
         del self.meta
+
+    def get_path(self):
+        return os.path.dirname(self.module.__file__)
