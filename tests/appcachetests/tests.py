@@ -6,7 +6,7 @@ import threading
 
 from django.apps import cache
 from django.apps.cache import _initialize
-from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
+from django.apps.signals import app_loaded, post_apps_loaded
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.datastructures import SortedDict
@@ -574,17 +574,6 @@ class SignalTests(AppCacheTestCase):
         app_loaded.connect(app_loaded_callback)
 
         settings.INSTALLED_APPS = ('model_app',)
-        cache._populate()
-        self.assertTrue(cache.app_cache_ready())
-        self.assertTrue(self.signal_fired)
-
-    def test_pre_apps_loaded(self):
-        """
-        Test the pre_apps_loaded signal
-        """
-        def callback(sender, **kwargs):
-            self.signal_fired = True
-        pre_apps_loaded.connect(callback)
         cache._populate()
         self.assertTrue(cache.app_cache_ready())
         self.assertTrue(self.signal_fired)

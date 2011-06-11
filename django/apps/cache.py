@@ -9,7 +9,7 @@ from django.utils.importlib import import_module
 from django.utils.module_loading import module_has_submodule
 
 from django.apps.base import App
-from django.apps.signals import app_loaded, pre_apps_loaded, post_apps_loaded
+from django.apps.signals import app_loaded, post_apps_loaded
 
 
 def _initialize():
@@ -77,9 +77,6 @@ class AppCache(object):
         try:
             if self.loaded:
                 return
-            # send the pre_apps_loaded signal
-            pre_apps_loaded.send(sender=self)
-
             for app_name in settings.INSTALLED_APPS:
                 if app_name in self.handled:
                     continue

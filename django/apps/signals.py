@@ -4,5 +4,4 @@ from django.dispatch import Signal
 app_loaded = Signal(providing_args=["app"])
 
 # Sent when the app cache loads the apps
-pre_apps_loaded = Signal()
 post_apps_loaded = Signal(providing_args=["apps"])
