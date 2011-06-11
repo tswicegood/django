@@ -1283,7 +1283,7 @@ class Templates(unittest.TestCase):
             'legacyi18n28': ('{% load i18n %}{% blocktrans with anton as a and berta as b %}{{ a }} + {{ b }}{% endblocktrans %}', {'anton': 'α', 'berta': 'β'}, u'α + β'),
 
             # retrieving language information
-            'i18n28': ('{% load i18n %}{% get_language_info for "de" as l %}{{ l.code }}: {{ l.name }}/{{ l.name_local }} bidi={{ l.bidi }}', {}, 'de: German/Deutsch bidi=False'),
+            'i18n28_2': ('{% load i18n %}{% get_language_info for "de" as l %}{{ l.code }}: {{ l.name }}/{{ l.name_local }} bidi={{ l.bidi }}', {}, 'de: German/Deutsch bidi=False'),
             'i18n29': ('{% load i18n %}{% get_language_info for LANGUAGE_CODE as l %}{{ l.code }}: {{ l.name }}/{{ l.name_local }} bidi={{ l.bidi }}', {'LANGUAGE_CODE': 'fi'}, 'fi: Finnish/suomi bidi=False'),
             'i18n30': ('{% load i18n %}{% get_language_info_list for langcodes as langs %}{% for l in langs %}{{ l.code }}: {{ l.name }}/{{ l.name_local }} bidi={{ l.bidi }}; {% endfor %}', {'langcodes': ['it', 'no']}, u'it: Italian/italiano bidi=False; no: Norwegian/Norsk bidi=False; '),
             'i18n31': ('{% load i18n %}{% get_language_info_list for langcodes as langs %}{% for l in langs %}{{ l.code }}: {{ l.name }}/{{ l.name_local }} bidi={{ l.bidi }}; {% endfor %}', {'langcodes': (('sl', 'Slovenian'), ('fa', 'Persian'))}, u'sl: Slovenian/Sloven\u0161\u010dina bidi=False; fa: Persian/\u0641\u0627\u0631\u0633\u06cc bidi=True; '),
@@ -1299,7 +1299,7 @@ class Templates(unittest.TestCase):
             'invalidstr02': ('{{ var|default_if_none:"Foo" }}', {}, ('','INVALID')),
             'invalidstr03': ('{% for v in var %}({{ v }}){% endfor %}', {}, ''),
             'invalidstr04': ('{% if var %}Yes{% else %}No{% endif %}', {}, 'No'),
-            'invalidstr04': ('{% if var|default:"Foo" %}Yes{% else %}No{% endif %}', {}, 'Yes'),
+            'invalidstr04_2': ('{% if var|default:"Foo" %}Yes{% else %}No{% endif %}', {}, 'Yes'),
             'invalidstr05': ('{{ var }}', {}, ('', ('INVALID %s', 'var'))),
             'invalidstr06': ('{{ var.prop }}', {'var': {}}, ('', ('INVALID %s', 'var.prop'))),
 
@@ -1324,12 +1324,12 @@ class Templates(unittest.TestCase):
                             """),
 
             ### REGROUP TAG ###########################################################
-            'regroup01': ('{% regroup data by bar as grouped %}' + \
-                          '{% for group in grouped %}' + \
-                          '{{ group.grouper }}:' + \
-                          '{% for item in group.list %}' + \
-                          '{{ item.foo }}' + \
-                          '{% endfor %},' + \
+            'regroup01': ('{% regroup data by bar as grouped %}'
+                          '{% for group in grouped %}'
+                          '{{ group.grouper }}:'
+                          '{% for item in group.list %}'
+                          '{{ item.foo }}'
+                          '{% endfor %},'
                           '{% endfor %}',
                           {'data': [ {'foo':'c', 'bar':1},
                                      {'foo':'d', 'bar':1},
@@ -1339,12 +1339,12 @@ class Templates(unittest.TestCase):
                           '1:cd,2:ab,3:x,'),
 
             # Test for silent failure when target variable isn't found
-            'regroup02': ('{% regroup data by bar as grouped %}' + \
-                          '{% for group in grouped %}' + \
-                          '{{ group.grouper }}:' + \
-                          '{% for item in group.list %}' + \
-                          '{{ item.foo }}' + \
-                          '{% endfor %},' + \
+            'regroup02': ('{% regroup data by bar as grouped %}'
+                          '{% for group in grouped %}'
+                          '{{ group.grouper }}:'
+                          '{% for item in group.list %}'
+                          '{{ item.foo }}'
+                          '{% endfor %},'
                           '{% endfor %}',
                           {}, ''),
             ### SSI TAG ########################################################
@@ -1385,6 +1385,11 @@ class Templates(unittest.TestCase):
             'templatetag10': ('{% templatetag closebrace %}{% templatetag closebrace %}', {}, '}}'),
             'templatetag11': ('{% templatetag opencomment %}', {}, '{#'),
             'templatetag12': ('{% templatetag closecomment %}', {}, '#}'),
+
+            # Simple tags with customized names
+            'simpletag-renamed01': ('{% load custom %}{% minusone 7 %}', {}, '6'),
+            'simpletag-renamed02': ('{% load custom %}{% minustwo 7 %}', {}, '5'),
+            'simpletag-renamed03': ('{% load custom %}{% minustwo_overridden_name 7 %}', {}, template.TemplateSyntaxError),
 
             ### WIDTHRATIO TAG ########################################################
             'widthratio01': ('{% widthratio a b 0 %}', {'a':50,'b':100}, '0'),
