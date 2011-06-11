@@ -1,5 +1,6 @@
+from django.apps import cache, get_apps, get_models
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import get_apps, get_models, signals
+from django.db.models import signals
 from django.utils.encoding import smart_unicode
 
 def update_contenttypes(app, created_models, verbosity=2, **kwargs):
@@ -7,8 +8,9 @@ def update_contenttypes(app, created_models, verbosity=2, **kwargs):
     Creates content types for models in the given app, removing any model
     entries that no longer have a matching model class.
     """
+    app_cls = cache.find_app_by_models_module(app)
     ContentType.objects.clear_cache()
-    content_types = list(ContentType.objects.filter(app_label=app.__name__.split('.')[-2]))
+    content_types = list(ContentType.objects.filter(app_label=app_cls._meta.label))
     app_models = get_models(app)
     if not app_models:
         return

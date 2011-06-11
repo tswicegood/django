@@ -1,10 +1,10 @@
 import os
 import re
 
+from django.apps import cache, get_models
 from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import models
-from django.db.models import get_models
 
 def sql_create(app, style, connection):
     "Returns a list of the CREATE TABLE SQL statements for the given app."
@@ -182,7 +182,8 @@ def custom_sql_for_model(model, style, connection):
 def emit_post_sync_signal(created_models, verbosity, interactive, db):
     # Emit the post_sync signal for every application.
     for app in models.get_apps():
-        app_name = app.__name__.split('.')[-2]
+        app_cls = cache.find_app_by_models_module(app)
+        app_name = app_cls._meta.label
         if verbosity >= 2:
             print "Running post-sync handlers for application", app_name
         models.signals.post_syncdb.send(sender=app, app=app,

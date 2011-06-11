@@ -60,7 +60,8 @@ class Options(object):
         from django.db.backends.util import truncate_name
 
         cls._meta = self
-        self.installed = re.sub('\.models$', '', cls.__module__) in settings.INSTALLED_APPS
+        # The AppCache sets this attribute to True for apps that are installed
+        self.installed = False
         # First, construct the default values for these options.
         self.object_name = cls.__name__
         self.module_name = self.object_name.lower()

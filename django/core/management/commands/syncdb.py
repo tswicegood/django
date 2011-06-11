@@ -64,10 +64,11 @@ class Command(NoArgsCommand):
 
         # Build the manifest of apps and models that are to be synchronized
         all_models = [
-            (app.__name__.split('.')[-2],
-                [m for m in models.get_models(app, include_auto_created=True)
+            (app._meta.label,
+                [m for m in models.get_models(app._meta.models_module,
+                                              include_auto_created=True)
                 if router.allow_syncdb(db, m)])
-            for app in models.get_apps()
+            for app in cache.loaded_apps
         ]
         def model_installed(model):
             opts = model._meta
@@ -101,7 +102,6 @@ class Command(NoArgsCommand):
                 for statement in sql:
                     cursor.execute(statement)
                 tables.append(connection.introspection.table_name_converter(model._meta.db_table))
-
 
         transaction.commit_unless_managed(using=db)
 

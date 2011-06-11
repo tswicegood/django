@@ -84,12 +84,18 @@ class AppCache(object):
             if not self.nesting_level:
                 for app_name in self.postponed:
                     self.load_app(app_name)
-                # assign the models to the app instances
-                for app_label, models in self.app_models.iteritems():
-                    app = self.find_app(app_label)
-                    if not app:
-                        continue
-                    app._meta.models.update(models)
+                # assign models to app instances
+                for app in self.loaded_apps:
+                    parents = [p for p in app.__class__.mro() if
+                               hasattr(p, '_meta')]
+                    for parent in reversed(parents):
+                        p_models = self.app_models.get(parent._meta.label, {})
+                        # update app_label and installed attribute of parent models
+                        for model in p_models.itervalues():
+                            model._meta.app_label = app._meta.label
+                            model._meta.installed = True
+                        app._meta.models.update(p_models)
+
                 # check if there is more than one app with the same
                 # db_prefix attribute
                 for app1 in self.loaded_apps:
@@ -200,6 +206,14 @@ class AppCache(object):
             if app._meta.label == app_label:
                 return app
 
+    def find_app_by_models_module(self, models_module):
+        """
+        Returns the app instance that matches the models module
+        """
+        for app in self.loaded_apps:
+            if app._meta.models_module == models_module:
+                return app
+
     def app_cache_ready(self):
         """
         Returns true if the model cache is fully populated.
@@ -269,10 +283,9 @@ class AppCache(object):
         self._populate()
         app_list = []
         if app_mod and only_installed:
-            app_label = app_mod.__name__.split('.')[-2]
-            app = self.find_app(app_label)
+            app = self.find_app_by_models_module(app_mod)
             if app:
-                app_list = [self.app_models.get(app_label, SortedDict())]
+                app_list = [app._meta.models]
         else:
             if only_installed:
                 app_list = [app._meta.models for app in self.loaded_apps]
