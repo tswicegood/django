@@ -73,10 +73,12 @@ documentation for :attr:`~django.contrib.admin.ModelAdmin.list_filter`.
 Multiple sort in admin interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The admin change list now supports sorting on multiple columns. It respects all
-elements of the :attr:`~django.contrib.admin.ModelAdmin.ordering` attribute, and
-sorting on multiple columns by clicking on headers is designed to work similarly
-to how desktop GUIs do it.
+The admin change list now supports sorting on multiple columns. It respects
+all elements of the :attr:`~django.contrib.admin.ModelAdmin.ordering`
+attribute, and sorting on multiple columns by clicking on headers is designed
+to work similarly to how desktop GUIs do it. The new hook
+:meth:`~django.contrib.admin.ModelAdmin.get_ordering` for specifying the
+ordering dynamically (e.g. depending on the request) has also been added.
 
 Tools for cryptographic signing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -165,6 +167,16 @@ a :class:`~django.forms.fields.GenericIPAddressField` form field and
 the validators :data:`~django.core.validators.validate_ipv46_address` and
 :data:`~django.core.validators.validate_ipv6_address`
 
+Translating URL patterns
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Django 1.4 gained the ability to look for a language prefix in the URL pattern
+when using the new :func:`django.conf.urls.i18n.i18n_patterns` helper function.
+Additionally, it's now possible to define translatable URL patterns using
+:func:`~django.utils.translation.ugettext_lazy`. See
+:ref:`url-internationalization` for more information about the language prefix
+and how to internationalize URL patterns.
+
 Minor features
 ~~~~~~~~~~~~~~
 
@@ -176,6 +188,9 @@ Django 1.4 also includes several smaller improvements worth noting:
   for issues in user code.
 
 * Customizable names for :meth:`~django.template.Library.simple_tag`.
+
+* In the documentation, a helpful :doc:`security overview </topics/security>`
+  page.
 
 .. _backwards-incompatible-changes-1.4:
 
@@ -338,7 +353,7 @@ Previously, Django's :doc:`CSRF protection </ref/contrib/csrf/>` provided
 protection against only POST requests. Since use of PUT and DELETE methods in
 AJAX applications is becoming more common, we now protect all methods not
 defined as safe by RFC 2616 i.e. we exempt GET, HEAD, OPTIONS and TRACE, and
-enforce protection on everything.
+enforce protection on everything else.
 
 If you using PUT or DELETE methods in AJAX applications, please see the
 :ref:`instructions about using AJAX and CSRF <csrf-ajax>`.
