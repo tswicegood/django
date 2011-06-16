@@ -283,7 +283,8 @@ class AppCache(object):
         self._populate()
         app_list = []
         if app_mod and only_installed:
-            app = self.find_app_by_models_module(app_mod)
+            app_label = app_mod.__name__.split('.')[-2]
+            app = self.find_app(app_label)
             if app:
                 app_list = [app._meta.models]
         else:
