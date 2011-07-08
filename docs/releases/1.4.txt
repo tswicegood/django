@@ -80,6 +80,13 @@ to work similarly to how desktop GUIs do it. The new hook
 :meth:`~django.contrib.admin.ModelAdmin.get_ordering` for specifying the
 ordering dynamically (e.g. depending on the request) has also been added.
 
+``ModelAdmin.save_related()``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new :meth:`~django.contrib.admin.ModelAdmin.save_related` hook was added to
+:mod:`~django.contrib.admin.ModelAdmin` to ease the customization of how
+related objects are saved in the admin.
+
 Tools for cryptographic signing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -88,6 +95,16 @@ for setting and reading signed cookies, one of the most common uses of
 signing in Web applications.
 
 See :doc:`cryptographic signing </topics/signing>` docs for more information.
+
+Cookie-based session backend
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Django 1.4 introduces a new cookie based backend for the session framework
+which uses the tools for :doc:`cryptographic signing </topics/signing>` to
+store the session data in the client's browser.
+
+See the :ref:`cookie-based backend <cookie-session-backend>` docs for
+more information.
 
 New form wizard
 ~~~~~~~~~~~~~~~
@@ -192,10 +209,54 @@ Django 1.4 also includes several smaller improvements worth noting:
 * In the documentation, a helpful :doc:`security overview </topics/security>`
   page.
 
+* Function :func:`django.contrib.auth.models.check_password` has been moved
+  to the :mod:`django.contrib.auth.utils` module. Importing it from the old
+  location will still work, but you should update your imports.
+
+* The :djadmin:`collectstatic` management command gained a ``--clear`` option
+  to delete all files at the destination before copying or linking the static
+  files.
+
 .. _backwards-incompatible-changes-1.4:
 
 Backwards incompatible changes in 1.4
 =====================================
+
+django.contrib.admin
+~~~~~~~~~~~~~~~~~~~~
+
+The included administration app ``django.contrib.admin`` has for a long time
+shipped with a default set of static files such as JavaScript, images and
+stylesheets. Django 1.3 added a new contrib app ``django.contrib.staticfiles``
+to handle such files in a generic way and defined conventions for static
+files included in apps.
+
+Starting in Django 1.4 the admin's static files are now also following this
+convention to make it easier to deploy the included files. In previous
+versions of Django, it was also common to define a ``ADMIN_MEDIA_PREFIX``
+setting to point to the URL where the admin's static files are served by a
+web server. This setting has now been deprecated and replaced by the more
+general setting :setting:`STATIC_URL`. Django will now expect to find the
+admin static files under the URL ``<STATIC_URL>/admin/``.
+
+If you've previously used a URL path for ``ADMIN_MEDIA_PREFIX`` (e.g.
+``/media/``) simply make sure :setting:`STATIC_URL` and :setting:`STATIC_ROOT`
+are configured and your web server serves the files correctly. The development
+server continues to serve the admin files just like before. Don't hesitate to
+consult the :doc:`static files howto </howto/static-files>` for further
+details.
+
+In case your ``ADMIN_MEDIA_PREFIX`` is set to an own domain (e.g.
+``http://media.example.com/admin/``) make sure to also set your
+:setting:`STATIC_URL` setting to the correct URL, for example
+``http://media.example.com/``.
+
+.. warning::
+
+    If you're implicitely relying on the path of the admin static files on
+    your server's file system when you deploy your site, you have to update
+    that path. The files were moved from :file:`django/contrib/admin/media/`
+    to :file:`django/contrib/admin/static/admin/`.
 
 Compatibility with old signed data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -376,3 +437,55 @@ Old styles of calling ``cache_page`` decorator
 Some legacy ways of calling :func:`~django.views.decorators.cache.cache_page`
 have been deprecated, please see the docs for the correct way to use this
 decorator.
+
+Support for PostgreSQL versions older than 8.2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Django 1.3 dropped support for PostgreSQL versions older than 8.0 and the
+relevant documents suggested to use a recent version because of performance
+reasons but more importantly because end of the upstream support periods for
+releases 8.0 and 8.1 was near (November 2010.)
+
+Django 1.4 takes that policy further and sets 8.2 as the minimum PostgreSQL
+version it officially supports.
+
+Request exceptions are now always logged
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When :doc:`logging support </topics/logging/>` was added to Django in 1.3, the
+admin error email support was moved into the
+:class:`django.utils.log.AdminEmailHandler`, attached to the
+``'django.request'`` logger. In order to maintain the established behavior of
+error emails, the ``'django.request'`` logger was called only when
+:setting:`DEBUG` was `False`.
+
+To increase the flexibility of request-error logging, the ``'django.request'``
+logger is now called regardless of the value of :setting:`DEBUG`, and the
+default settings file for new projects now includes a separate filter attached
+to :class:`django.utils.log.AdminEmailHandler` to prevent admin error emails in
+`DEBUG` mode::
+
+   'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda r: not DEBUG
+        }
+    },
+    'handlers': {
+        'mail_admins': {
+            'level': 'ERROR',
+            'filters': ['require_debug_false'],
+            'class': 'django.utils.log.AdminEmailHandler'
+        }
+    },
+
+If your project was created prior to this change, your :setting:`LOGGING`
+setting will not include this new filter. In order to maintain
+backwards-compatibility, Django will detect that your ``'mail_admins'`` handler
+configuration includes no ``'filters'`` section, and will automatically add
+this filter for you and issue a pending-deprecation warning. This will become a
+deprecation warning in Django 1.5, and in Django 1.6 the
+backwards-compatibility shim will be removed entirely.
+
+The existence of any ``'filters'`` key under the ``'mail_admins'`` handler will
+disable this backward-compatibility shim and deprecation warning.
