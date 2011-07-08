@@ -35,9 +35,7 @@ class AppOptions(object):
                 # Ignore any private attributes that Django doesn't care about.
                 if name.startswith('_'):
                     del meta_attrs[name]
-            from django.apps.base import AppBase
-            parents = [b for b in cls.__bases__
-                       if isinstance(b, AppBase) and hasattr(b, '_meta')]
+            parents = [b for b in cls.__bases__ if hasattr(b, '_meta')]
             for attr_name in DEFAULT_NAMES:
                 if attr_name in meta_attrs:
                     setattr(self, attr_name, meta_attrs.pop(attr_name))

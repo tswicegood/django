@@ -47,6 +47,10 @@ class App(object):
     """
     __metaclass__ = AppBase
 
+    def __init__(self, **kwargs):
+        for key, value in kwargs.iteritems():
+            setattr(self._meta, key, value)
+
     def __repr__(self):
         return '<App: %s>' % self._meta.name
 

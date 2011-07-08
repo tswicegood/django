@@ -19,7 +19,6 @@ class AppCacheTestCase(unittest.TestCase):
     """
     TestCase that resets the AppCache after each test.
     """
-
     def setUp(self):
         self.old_installed_apps = settings.INSTALLED_APPS
         settings.INSTALLED_APPS = ()
@@ -554,6 +553,39 @@ class FindAppTests(AppCacheTestCase):
         app = cache.find_app('model_app')
         self.assertEquals(app._meta.name, 'model_app')
         self.assertTrue(isinstance(app, App))
+
+    def test_option_override(self):
+        """
+        Tests that options of the app can be overridden in the settings
+        """
+        settings.INSTALLED_APPS = (
+            ('django.contrib.admin', {
+                'spam': 'spam',
+            }),
+            ('model_app.app.MyOverrideApp', {
+                'db_prefix': 'foobar_prefix',
+                'eggs': 'eggs',
+            }),
+        )
+        cache._populate()
+        admin = cache.find_app('admin')
+        self.assertEquals(admin._meta.spam, 'spam')
+        model_app = cache.find_app('model_app')
+        self.assertEquals(model_app._meta.db_prefix, 'foobar_prefix')
+        self.assertEquals(model_app._meta.eggs, 'eggs')
+
+    def test_conflicting_option_override(self):
+        """
+        Tests that when overrdiding the db_prefix option in the settings
+        it still throws an exception
+        """
+        settings.INSTALLED_APPS = (
+            'nomodel_app.app.MyApp',
+            ('model_app.app.MyOtherApp', {
+                'db_prefix': 'nomodel_app',
+            }),
+        )
+        self.assertRaises(ImproperlyConfigured, cache._populate)
 
 
 class SignalTests(AppCacheTestCase):

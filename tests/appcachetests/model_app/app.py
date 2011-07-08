@@ -27,3 +27,8 @@ class MyThirdApp(MySecondApp, YetAnotherApp):
 
     class Meta:
         pass
+
+
+class MyOverrideApp(MyOtherApp):
+
+    pass

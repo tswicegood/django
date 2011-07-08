@@ -78,23 +78,27 @@ class AppCache(object):
             if self.loaded:
                 return
             for app_name in settings.INSTALLED_APPS:
+                if isinstance(app_name, (tuple, list)):
+                    app_name, app_kwargs = app_name
+                else:
+                    app_kwargs = {}
                 if app_name in self.handled:
                     continue
-                self.load_app(app_name, True)
+                self.load_app(app_name, app_kwargs, True)
             if not self.nesting_level:
-                for app_name in self.postponed:
-                    self.load_app(app_name)
+                for app_name, app_kwargs in self.postponed:
+                    self.load_app(app_name, app_kwargs)
                 # assign models to app instances
                 for app in self.loaded_apps:
                     parents = [p for p in app.__class__.mro() if
                                hasattr(p, '_meta')]
                     for parent in reversed(parents):
-                        p_models = self.app_models.get(parent._meta.label, {})
+                        parent_models = self.app_models.get(parent._meta.label, {})
                         # update app_label and installed attribute of parent models
-                        for model in p_models.itervalues():
+                        for model in parent_models.itervalues():
                             model._meta.app_label = app._meta.label
                             model._meta.installed = True
-                        app._meta.models.update(p_models)
+                        app._meta.models.update(parent_models)
 
                 # check if there is more than one app with the same
                 # db_prefix attribute
@@ -147,7 +151,7 @@ class AppCache(object):
                     return app_class
         return App.from_name(app_name)
 
-    def load_app(self, app_name, can_postpone=False):
+    def load_app(self, app_name, app_kwargs=None, can_postpone=False):
         """
         Loads the app with the provided fully qualified name, and returns the
         model module.
@@ -158,6 +162,9 @@ class AppCache(object):
                 the loading will be postponed and tried again when all other
                 modules are loaded.
         """
+        if app_kwargs is None:
+            app_kwargs = {}
+
         self.handled.append(app_name)
         self.nesting_level += 1
 
@@ -166,7 +173,7 @@ class AppCache(object):
         app = self.find_app(app_name.split('.')[-1])
         if not app:
             app_class = self.get_app_class(app_name)
-            app = app_class()
+            app = app_class(**app_kwargs)
             self.loaded_apps.append(app)
             # Send the signal that the app has been loaded
             app_loaded.send(sender=app_class, app=app)
@@ -189,7 +196,7 @@ class AppCache(object):
             # then it's time to raise the ImportError.
             else:
                 if can_postpone:
-                    self.postponed.append(app_name)
+                    self.postponed.append((app_name, app_kwargs))
                     return None
                 else:
                     raise
