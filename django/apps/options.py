@@ -3,12 +3,10 @@ import os
 
 from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
+from django.utils.text import get_verbose_name
 
 DEFAULT_NAMES = ('verbose_name', 'db_prefix', 'models_path')
 
-def get_verbose_name(class_name):
-    new = re.sub('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))', ' \\1', class_name)
-    return new.lower().strip()
 
 class AppOptions(object):
     def __init__(self, name, meta):

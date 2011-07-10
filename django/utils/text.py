@@ -265,9 +265,9 @@ def unescape_entities(text):
 unescape_entities = allow_lazy(unescape_entities, unicode)
 
 def unescape_string_literal(s):
-    r"""
-    Convert quoted string literals to unquoted strings with escaped quotes and
-    backslashes unquoted::
+    """
+    Converts quoted string literals to unquoted strings with escaped quotes
+    and backslashes unquoted::
 
         >>> unescape_string_literal('"abc"')
         'abc'
@@ -283,3 +283,11 @@ def unescape_string_literal(s):
     quote = s[0]
     return s[1:-1].replace(r'\%s' % quote, quote).replace(r'\\', '\\')
 unescape_string_literal = allow_lazy(unescape_string_literal)
+
+def get_verbose_name(class_name):
+    """
+    Calculates the verbose_name by converting from
+    InitialCaps to "lowercase with spaces".
+    """
+    new = re.sub('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))', ' \\1', class_name)
+    return new.lower().strip()

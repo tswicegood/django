@@ -11,9 +11,8 @@ from django.db.models.loading import get_models, app_cache_ready
 from django.utils.translation import activate, deactivate_all, get_language, string_concat
 from django.utils.encoding import force_unicode, smart_str
 from django.utils.datastructures import SortedDict
+from django.utils.text import get_verbose_name
 
-# Calculate the verbose_name by converting from InitialCaps to "lowercase with spaces".
-get_verbose_name = lambda class_name: re.sub('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))', ' \\1', class_name).lower().strip()
 
 DEFAULT_NAMES = ('verbose_name', 'verbose_name_plural', 'db_table', 'ordering',
                  'unique_together', 'permissions', 'get_latest_by',
