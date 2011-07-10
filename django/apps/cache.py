@@ -90,8 +90,8 @@ class AppCache(object):
                     self.load_app(app_name, app_kwargs)
                 # assign models to app instances
                 for app in self.loaded_apps:
-                    parents = [p for p in app.__class__.mro() if
-                               hasattr(p, '_meta')]
+                    parents = [p for p in app.__class__.mro()
+                               if hasattr(p, '_meta')]
                     for parent in reversed(parents):
                         parent_models = self.app_models.get(parent._meta.label, {})
                         # update app_label and installed attribute of parent models

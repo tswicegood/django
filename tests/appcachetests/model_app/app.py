@@ -7,13 +7,13 @@ class MyApp(apps.App):
 
 class MyOtherApp(MyApp):
 
-    class Meta:
+    class Meta(MyApp.Meta):
         db_prefix = 'nomodel_app'
 
 
 class MySecondApp(MyOtherApp):
 
-    class Meta:
+    class Meta(MyOtherApp.Meta):
         models_path = 'model_app.models'
 
 
@@ -23,9 +23,9 @@ class YetAnotherApp(apps.App):
         models_path = 'model_app.yetanother'
 
 
-class MyThirdApp(MySecondApp, YetAnotherApp):
+class MyThirdApp(YetAnotherApp, MySecondApp):
 
-    class Meta:
+    class Meta(YetAnotherApp.Meta, MySecondApp.Meta):
         pass
 
 

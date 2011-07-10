@@ -33,16 +33,11 @@ class AppOptions(object):
                 # Ignore any private attributes that Django doesn't care about.
                 if name.startswith('_'):
                     del meta_attrs[name]
-            parents = [b for b in cls.__bases__ if hasattr(b, '_meta')]
             for attr_name in DEFAULT_NAMES:
                 if attr_name in meta_attrs:
                     setattr(self, attr_name, meta_attrs.pop(attr_name))
                 elif hasattr(self.meta, attr_name):
                     setattr(self, attr_name, getattr(self.meta, attr_name))
-                else:
-                    for parent in parents:
-                        if getattr(parent._meta, attr_name) != defaults.get(attr_name):
-                            setattr(self, attr_name, getattr(parent._meta, attr_name))
             # Any leftover attributes must be invalid.
             if meta_attrs != {}:
                 raise TypeError("'class Meta' got invalid attribute(s): %s"

@@ -32,6 +32,8 @@ class AppBase(type):
             app_module = sys.modules[new_class.__module__]
             app_name = app_module.__name__.rsplit('.', 1)[0]
         new_class.add_to_class('_meta', AppOptions(app_name, meta))
+        # For easier Meta inheritance
+        new_class.add_to_class('Meta', attr_meta)
         return new_class
 
     def add_to_class(cls, name, value):

@@ -46,7 +46,7 @@ class ReloadTests(AppCacheTestCase):
         cache._populate()
         self.assertEquals(len(cache.loaded_apps), 1)
         self.assertEquals(cache.loaded_apps[0]._meta.name, 'model_app')
-        settings.INSTALLED_APPS = ('anothermodel_app', 'model_app',)
+        settings.INSTALLED_APPS = ('anothermodel_app', 'model_app')
         cache._reload()
         self.assertEquals(len(cache.loaded_apps), 2)
         self.assertEquals(cache.loaded_apps[0]._meta.name, 'anothermodel_app')
@@ -275,7 +275,7 @@ class GetModelsTests(AppCacheTestCase):
         """
         from model_app import models
         from model_app.models import Person
-        settings.INSTALLED_APPS = ('model_app', 'anothermodel_app',)
+        settings.INSTALLED_APPS = ('model_app', 'anothermodel_app')
         models = cache.get_models(app_mod=models)
         self.assertTrue(cache.app_cache_ready())
         self.assertEqual(models, [Person])
@@ -434,7 +434,7 @@ class LoadAppTests(AppCacheTestCase):
         self.assertEqual(app._meta.name, 'model_app')
         self.assertEqual(app._meta.models_module.__name__, 'model_app.yetanother')
         self.assertEqual(mod.__name__, 'model_app.yetanother')
-        self.assertEqual(app.__class__.__bases__, (MySecondApp, YetAnotherApp,))
+        self.assertEqual(app.__class__.__bases__, (YetAnotherApp, MySecondApp))
         self.assertEqual(app._meta.models_path, 'model_app.yetanother')
         self.assertEqual(app._meta.db_prefix, 'nomodel_app')
         self.assertEqual(app._meta.verbose_name, 'model_app')
@@ -614,7 +614,7 @@ class SignalTests(AppCacheTestCase):
         """
         Test the post_apps_loaded signal
         """
-        settings.INSTALLED_APPS = ('model_app', 'anothermodel_app',)
+        settings.INSTALLED_APPS = ('model_app', 'anothermodel_app')
         def callback(sender, apps, **kwargs):
             self.assertEqual(len(apps), 2)
             self.assertEqual(apps[0]._meta.name, 'model_app')
