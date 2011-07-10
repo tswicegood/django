@@ -569,10 +569,11 @@ class FindAppTests(AppCacheTestCase):
         )
         cache._populate()
         admin = cache.find_app('admin')
-        self.assertEquals(admin._meta.spam, 'spam')
+        self.assertRaises(AttributeError, lambda: admin._meta.spam)
+        self.assertEquals(admin.spam, 'spam')
         model_app = cache.find_app('model_app')
         self.assertEquals(model_app._meta.db_prefix, 'foobar_prefix')
-        self.assertEquals(model_app._meta.eggs, 'eggs')
+        self.assertEquals(model_app.eggs, 'eggs')
 
     def test_conflicting_option_override(self):
         """
