@@ -3,9 +3,7 @@ import sys
 
 from django.apps.options import AppOptions, DEFAULT_NAMES
 
-def get_class_name(module_name):
-    new = re.sub(r'_([a-z])', lambda m: (m.group(1).upper()), module_name)
-    return new[0].upper() + new[1:]
+module_name_re = re.compile(r'_([a-z])')
 
 
 class AppBase(type):
@@ -58,5 +56,6 @@ class App(object):
 
     @classmethod
     def from_name(cls, name):
-        cls_name = get_class_name(name.split('.')[-1])
-        return type(cls_name, (cls,), {'_name': name})
+        upper = lambda match: match.group(1).upper()
+        cls_name = module_name_re.sub(upper, name.split('.')[-1])
+        return type(cls_name[0].upper()+cls_name[1:], (cls,), {'_name': name})
