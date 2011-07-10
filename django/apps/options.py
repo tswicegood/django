@@ -21,6 +21,7 @@ class AppOptions(object):
         self.label = self.name.split('.')[-1]
         self.models_module = None
         self.module = import_module(self.name)
+        self.path = os.path.dirname(self.module.__file__)
         defaults = {
             'db_prefix': self.label,
             'models_path': '%s.models' % self.name,
@@ -47,6 +48,3 @@ class AppOptions(object):
         for k, v in defaults.iteritems():
             if not hasattr(self, k):
                 setattr(self, k, v)
-
-    def get_path(self):
-        return os.path.dirname(self.module.__file__)

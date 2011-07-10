@@ -43,5 +43,5 @@ class AppStaticStorage(FileSystemStorage):
         Returns a static file storage if available in the given app.
         """
         # app is the actual app module
-        location = os.path.join(app._meta.get_path(), self.source_dir)
+        location = os.path.join(app._meta.path, self.source_dir)
         super(AppStaticStorage, self).__init__(location, *args, **kwargs)

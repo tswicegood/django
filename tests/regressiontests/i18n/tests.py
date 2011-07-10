@@ -621,9 +621,9 @@ class ResolutionOrderI18NTests(TestCase):
 
 class MockedApp(object):
     class Meta:
-        def get_path(self):
-            result = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resolution')
-            return result
+        def path(self):
+            return os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 'resolution')
     _meta = Meta()
 
 class AppResolutionOrderI18NTests(ResolutionOrderI18NTests):

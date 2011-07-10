@@ -18,7 +18,7 @@ from django.utils.importlib import import_module
 fs_encoding = sys.getfilesystemencoding() or sys.getdefaultencoding()
 app_template_dirs = []
 for app in cache.loaded_apps:
-    template_dir = os.path.join(app._meta.get_path(), 'templates')
+    template_dir = os.path.join(app._meta.path, 'templates')
     if os.path.isdir(template_dir):
         app_template_dirs.append(template_dir.decode(fs_encoding))
 
