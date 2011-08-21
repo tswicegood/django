@@ -1,6 +1,5 @@
 from functools import update_wrapper
-from django.conf import settings
-from django.db import connection, DEFAULT_DB_ALIAS
+from django.db import connection
 from django.test import TestCase, skipUnlessDBFeature
 
 from models import Reporter, Article
@@ -95,6 +94,16 @@ class IntrospectionTests(TestCase):
         if relations:
             # That's {field_index: (field_index_other_table, other_table)}
             self.assertEqual(relations, {3: (0, Reporter._meta.db_table)})
+
+    def test_get_key_columns(self):
+        cursor = connection.cursor()
+        key_columns = connection.introspection.get_key_columns(cursor, Article._meta.db_table)
+        self.assertEqual(key_columns, [(u'reporter_id', Reporter._meta.db_table, u'id')])
+
+    def test_get_primary_key_column(self):
+        cursor = connection.cursor()
+        primary_key_column = connection.introspection.get_primary_key_column(cursor, Article._meta.db_table)
+        self.assertEqual(primary_key_column, u'id')
 
     def test_get_indexes(self):
         cursor = connection.cursor()

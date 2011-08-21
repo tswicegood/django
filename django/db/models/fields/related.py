@@ -1,5 +1,4 @@
-from django.conf import settings
-from django.db import connection, router, transaction
+from django.db import connection, router
 from django.db.backends import util
 from django.db.models import signals, get_model
 from django.db.models.fields import (AutoField, Field, IntegerField,
@@ -9,8 +8,7 @@ from django.db.models.query import QuerySet
 from django.db.models.query_utils import QueryWrapper
 from django.db.models.deletion import CASCADE
 from django.utils.encoding import smart_unicode
-from django.utils.translation import (ugettext_lazy as _, string_concat,
-    ungettext, ugettext)
+from django.utils.translation import ugettext_lazy as _, string_concat
 from django.utils.functional import curry
 from django.core import exceptions
 from django import forms
@@ -907,6 +905,10 @@ class ForeignKey(RelatedField, Field):
 
     def formfield(self, **kwargs):
         db = kwargs.pop('using', None)
+        if isinstance(self.rel.to, basestring):
+            raise ValueError("Cannot create form field for %r yet, because "
+                             "its related model %r has not been loaded yet" %
+                             (self.name, self.rel.to))
         defaults = {
             'form_class': forms.ModelChoiceField,
             'queryset': self.rel.to._default_manager.using(db).complex_filter(self.rel.limit_choices_to),

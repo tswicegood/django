@@ -61,7 +61,7 @@ example::
     >>> ArticleFormSet = formset_factory(ArticleForm, extra=2)
     >>> formset = ArticleFormSet(initial=[
     ...     {'title': u'Django is now open source',
-    ...      'pub_date': datetime.date.today()},
+    ...      'pub_date': datetime.date.today(),}
     ... ])
 
     >>> for form in formset:

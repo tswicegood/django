@@ -3,14 +3,14 @@ Helper functions for creating Form classes from Django models
 and database field objects.
 """
 
+from django.core.exceptions import ValidationError, NON_FIELD_ERRORS, FieldError
+from django.core.validators import EMPTY_VALUES
+
 from django.utils.encoding import smart_unicode, force_unicode
 from django.utils.datastructures import SortedDict
 from django.utils.text import get_text_list, capfirst
 from django.utils.translation import ugettext_lazy as _, ugettext
 
-from django.core.exceptions import ValidationError, NON_FIELD_ERRORS, \
-                                   FieldError
-from django.core.validators import EMPTY_VALUES
 from util import ErrorList
 from forms import BaseForm, get_declared_fields
 from fields import Field, ChoiceField
@@ -117,7 +117,7 @@ def model_to_dict(instance, fields=None, exclude=None):
         if exclude and f.name in exclude:
             continue
         if isinstance(f, ManyToManyField):
-            # If the object doesn't have a primry key yet, just use an empty
+            # If the object doesn't have a primary key yet, just use an empty
             # list for its m2m fields. Calling f.value_from_object will raise
             # an exception.
             if instance.pk is None:
@@ -288,7 +288,7 @@ class BaseModelForm(BaseForm):
             # Exclude empty fields that are not required by the form, if the
             # underlying model field is required. This keeps the model field
             # from raising a required error. Note: don't exclude the field from
-            # validaton if the model field allows blanks. If it does, the blank
+            # validation if the model field allows blanks. If it does, the blank
             # value may be included in a unique check, so cannot be excluded
             # from validation.
             else:

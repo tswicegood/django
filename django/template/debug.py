@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.template.base import Lexer, Parser, tag_re, NodeList, VariableNode, TemplateSyntaxError
 from django.utils.encoding import force_unicode
 from django.utils.html import escape
@@ -79,7 +78,7 @@ class DebugNodeList(NodeList):
             from sys import exc_info
             wrapped = TemplateSyntaxError(u'Caught %s while rendering: %s' %
                 (e.__class__.__name__, force_unicode(e, errors='replace')))
-            wrapped.source = node.source
+            wrapped.source = getattr(e, 'template_node_source', node.source)
             wrapped.exc_info = exc_info()
             raise wrapped, None, wrapped.exc_info[2]
         return result

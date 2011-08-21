@@ -5,12 +5,14 @@ import re
 from datetime import datetime
 from itertools import groupby, cycle as itertools_cycle
 
-from django.template.base import Node, NodeList, Template, Context, Variable
-from django.template.base import TemplateSyntaxError, VariableDoesNotExist, BLOCK_TAG_START, BLOCK_TAG_END, VARIABLE_TAG_START, VARIABLE_TAG_END, SINGLE_BRACE_START, SINGLE_BRACE_END, COMMENT_TAG_START, COMMENT_TAG_END
-from django.template.base import get_library, Library, InvalidTemplateLibrary
+from django.conf import settings
+from django.template.base import (Node, NodeList, Template, Library,
+    TemplateSyntaxError, VariableDoesNotExist, InvalidTemplateLibrary,
+    BLOCK_TAG_START, BLOCK_TAG_END, VARIABLE_TAG_START, VARIABLE_TAG_END,
+    SINGLE_BRACE_START, SINGLE_BRACE_END, COMMENT_TAG_START, COMMENT_TAG_END,
+    get_library)
 from django.template.smartif import IfParser, Literal
 from django.template.defaultfilters import date
-from django.conf import settings
 from django.utils.encoding import smart_str, smart_unicode
 from django.utils.safestring import mark_safe
 
@@ -225,8 +227,21 @@ class ForNode(Node):
                     context.update(unpacked_vars)
             else:
                 context[self.loopvars[0]] = item
-            for node in self.nodelist_loop:
-                nodelist.append(node.render(context))
+            # In TEMPLATE_DEBUG mode providing source of the node which
+            # actually raised an exception to DefaultNodeList.render_node
+            if settings.TEMPLATE_DEBUG:
+                for node in self.nodelist_loop:
+                    try:
+                        nodelist.append(node.render(context))
+                    except Exception, e:
+                        if not hasattr(e, 'template_node_source'):
+                            from sys import exc_info
+                            e.template_node_source = node.source
+                            raise e, None, exc_info()[2]
+                        raise
+            else:
+                for node in self.nodelist_loop:
+                    nodelist.append(node.render(context))
             if pop_context:
                 # The loop variables were pushed on to the context so pop them
                 # off again. This is necessary because the tag lets the length

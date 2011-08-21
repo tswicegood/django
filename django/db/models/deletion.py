@@ -3,7 +3,6 @@ from operator import attrgetter
 
 from django.db import connections, transaction, IntegrityError
 from django.db.models import signals, sql
-from django.db.models.sql.constants import GET_ITERATOR_CHUNK_SIZE
 from django.utils.datastructures import SortedDict
 
 
@@ -218,7 +217,7 @@ class Collector(object):
             self.data[model] = sorted(instances, key=attrgetter("pk"))
 
         # if possible, bring the models in an order suitable for databases that
-        # don't support transactions or cannot defer contraint checks until the
+        # don't support transactions or cannot defer constraint checks until the
         # end of a transaction.
         self.sort()
 

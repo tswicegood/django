@@ -52,9 +52,9 @@ class GenericForeignKey(object):
         # using this model
         ContentType = get_model("contenttypes", "contenttype")
         if obj:
-             return ContentType.objects.db_manager(obj._state.db).get_for_model(obj)
+            return ContentType.objects.db_manager(obj._state.db).get_for_model(obj)
         elif id:
-             return ContentType.objects.db_manager(using).get_for_id(id)
+            return ContentType.objects.db_manager(using).get_for_id(id)
         else:
             # This should never happen. I love comments like this, don't you?
             raise Exception("Impossible arguments to GFK.get_content_type!")
@@ -406,6 +406,10 @@ class GenericInlineModelAdmin(InlineModelAdmin):
         else:
             exclude = list(self.exclude)
         exclude.extend(self.get_readonly_fields(request, obj))
+        if self.exclude is None and hasattr(self.form, '_meta') and self.form._meta.exclude:
+            # Take the custom ModelForm's Meta.exclude into account only if the
+            # GenericInlineModelAdmin doesn't define its own.
+            exclude.extend(self.form._meta.exclude)
         exclude = exclude or None
         defaults = {
             "ct_field": self.ct_field,

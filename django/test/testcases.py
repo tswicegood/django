@@ -6,7 +6,7 @@ from functools import wraps
 from urlparse import urlsplit, urlunsplit
 from xml.dom.minidom import parseString, Node
 
-from django.conf import settings, UserSettingsHolder
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.core.signals import request_started
@@ -21,7 +21,7 @@ from django.utils import simplejson, unittest as ut2
 from django.utils.encoding import smart_str
 
 __all__ = ('DocTestRunner', 'OutputChecker', 'TestCase', 'TransactionTestCase',
-           'skipIfDBFeature', 'skipUnlessDBFeature')
+           'SimpleTestCase', 'skipIfDBFeature', 'skipUnlessDBFeature')
 
 normalize_long_ints = lambda s: re.sub(r'(?<![\w])(\d+)L(?![\w])', '\\1', s)
 normalize_decimals = lambda s: re.sub(r"Decimal\('(\d+(\.\d*)?)'\)", lambda m: "Decimal(\"%s\")" % m.groups()[0], s)
@@ -235,8 +235,43 @@ class _AssertNumQueriesContext(object):
             )
         )
 
+class SimpleTestCase(ut2.TestCase):
 
-class TransactionTestCase(ut2.TestCase):
+    def save_warnings_state(self):
+        """
+        Saves the state of the warnings module
+        """
+        self._warnings_state = get_warnings_state()
+
+    def restore_warnings_state(self):
+        """
+        Restores the sate of the warnings module to the state
+        saved by save_warnings_state()
+        """
+        restore_warnings_state(self._warnings_state)
+
+    def settings(self, **kwargs):
+        """
+        A context manager that temporarily sets a setting and reverts
+        back to the original value when exiting the context.
+        """
+        return override_settings(**kwargs)
+
+    def assertRaisesMessage(self, expected_exception, expected_message,
+                           callable_obj=None, *args, **kwargs):
+        """Asserts that the message in a raised exception matches the passe value.
+
+        Args:
+            expected_exception: Exception class expected to be raised.
+            expected_message: expected error message string value.
+            callable_obj: Function to be called.
+            args: Extra args.
+            kwargs: Extra kwargs.
+        """
+        return self.assertRaisesRegexp(expected_exception,
+                re.escape(expected_message), callable_obj, *args, **kwargs)
+
+class TransactionTestCase(SimpleTestCase):
     # The class we'll use for the test client self.client.
     # Can be overridden in derived classes.
     client_class = Client
@@ -283,28 +318,27 @@ class TransactionTestCase(ut2.TestCase):
         include a call to super().setUp().
         """
         testMethod = getattr(self, self._testMethodName)
-        if (getattr(self.__class__, "__unittest_skip__", False) or
-            getattr(testMethod, "__unittest_skip__", False)):
-            return
+        skipped = (getattr(self.__class__, "__unittest_skip__", False) or
+            getattr(testMethod, "__unittest_skip__", False))
 
-        self.client = self.client_class()
-        try:
-            self._pre_setup()
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception:
-            import sys
-            result.addError(self, sys.exc_info())
-            return
+        if not skipped:
+            self.client = self.client_class()
+            try:
+                self._pre_setup()
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                result.addError(self, sys.exc_info())
+                return
         super(TransactionTestCase, self).__call__(result)
-        try:
-            self._post_teardown()
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception:
-            import sys
-            result.addError(self, sys.exc_info())
-            return
+        if not skipped:
+            try:
+                self._post_teardown()
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception:
+                result.addError(self, sys.exc_info())
+                return
 
     def _post_teardown(self):
         """ Performs any post-test things. This includes:
@@ -332,26 +366,6 @@ class TransactionTestCase(ut2.TestCase):
         if hasattr(self, '_old_root_urlconf'):
             settings.ROOT_URLCONF = self._old_root_urlconf
             clear_url_caches()
-
-    def save_warnings_state(self):
-        """
-        Saves the state of the warnings module
-        """
-        self._warnings_state = get_warnings_state()
-
-    def restore_warnings_state(self):
-        """
-        Restores the sate of the warnings module to the state
-        saved by save_warnings_state()
-        """
-        restore_warnings_state(self._warnings_state)
-
-    def settings(self, **kwargs):
-        """
-        A context manager that temporarily sets a setting and reverts
-        back to the original value when exiting the context.
-        """
-        return override_settings(**kwargs)
 
     def assertRedirects(self, response, expected_url, status_code=302,
                         target_status_code=200, host=None, msg_prefix=''):
@@ -544,7 +558,6 @@ class TransactionTestCase(ut2.TestCase):
         if func is None:
             return context
 
-        # Basically emulate the `with` statement here.
         with context:
             func(*args, **kwargs)
 

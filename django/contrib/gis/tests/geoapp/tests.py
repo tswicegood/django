@@ -1,12 +1,11 @@
 import re
 from django.db import connection
 from django.contrib.gis import gdal
-from django.contrib.gis.geos import fromstr, GEOSGeometry, \
-    Point, LineString, LinearRing, Polygon, GeometryCollection
-from django.contrib.gis.measure import Distance
-from django.contrib.gis.tests.utils import \
-    no_mysql, no_oracle, no_spatialite, \
-    mysql, oracle, postgis, spatialite
+from django.contrib.gis.geos import (fromstr, GEOSGeometry,
+    Point, LineString, LinearRing, Polygon, GeometryCollection)
+from django.contrib.gis.tests.utils import (
+    no_mysql, no_oracle, no_spatialite,
+    mysql, oracle, postgis, spatialite)
 from django.test import TestCase
 
 from models import Country, City, PennsylvaniaCity, State, Track
@@ -672,7 +671,7 @@ class GeoModelTest(TestCase):
                '12.40500 43.94833,12.40889 43.95499,12.41580 43.95795)))')
         sm = Country.objects.create(name='San Marino', mpoly=fromstr(wkt))
 
-        # Because floating-point arithmitic isn't exact, we set a tolerance
+        # Because floating-point arithmetic isn't exact, we set a tolerance
         # to pass into GEOS `equals_exact`.
         tol = 0.000000001
 

@@ -16,12 +16,12 @@ import warnings
 from urlparse import urljoin
 
 from django import template
-from django.template import base as template_base
+from django.template import base as template_base, RequestContext
 from django.core import urlresolvers
 from django.template import loader
 from django.template.loaders import app_directories, filesystem, cached
-from django.test.utils import get_warnings_state, restore_warnings_state,\
-    setup_test_template_loader, restore_template_loaders
+from django.test.utils import (get_warnings_state, restore_warnings_state,
+    setup_test_template_loader, restore_template_loaders)
 from django.utils import unittest
 from django.utils.formats import date_format
 from django.utils.translation import activate, deactivate, ugettext as _
@@ -33,7 +33,7 @@ from context import ContextTests
 from custom import CustomTagTests, CustomFilterTests
 from parser import ParserTests
 from unicode import UnicodeTests
-from nodelist import NodelistTest
+from nodelist import NodelistTest, ErrorIndexTest
 from smartif import *
 from response import *
 

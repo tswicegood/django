@@ -5,6 +5,6 @@ from django.apps import (App, AppCache, cache,
     register_models, load_app, app_cache_ready)
 
 warnings.warn(
-    'The utilities in django.db.models.loading have been moved to django.apps. Please update your code accordingly.',
-    PendingDeprecationWarning
-)
+    'The utilities in django.db.models.loading have been moved to '
+    'django.apps. Please update your code accordingly.',
+    PendingDeprecationWarning)

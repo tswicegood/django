@@ -1,9 +1,21 @@
 from __future__ import with_statement
 import os
 from django.conf import settings, global_settings
-from django.test import TestCase, signals
+from django.test import TransactionTestCase, TestCase, signals
 from django.test.utils import override_settings
 
+
+# @override_settings(TEST='override')
+class FullyDecoratedTranTestCase(TransactionTestCase):
+
+    def test_override(self):
+        self.assertEqual(settings.TEST, 'override')
+
+    @override_settings(TEST='override2')
+    def test_method_override(self):
+        self.assertEqual(settings.TEST, 'override2')
+
+FullyDecoratedTranTestCase = override_settings(TEST='override')(FullyDecoratedTranTestCase)
 
 # @override_settings(TEST='override')
 class FullyDecoratedTestCase(TestCase):
@@ -24,10 +36,11 @@ class SettingGetter(object):
 testvalue = None
 
 def signal_callback(sender, setting, value, **kwargs):
-    global testvalue
-    testvalue = value
+    if setting == 'TEST':
+        global testvalue
+        testvalue = value
 
-signals.setting_changed.connect(signal_callback, sender='TEST')
+signals.setting_changed.connect(signal_callback)
 
 class SettingsTests(TestCase):
 
