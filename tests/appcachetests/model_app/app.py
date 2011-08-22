@@ -1,6 +1,7 @@
 from django import apps
 
 class MyApp(apps.App):
+    some_attribute = True
 
     class Meta:
         models_path = 'model_app.othermodels'
@@ -32,3 +33,4 @@ class MyThirdApp(YetAnotherApp, MySecondApp):
 class MyOverrideApp(MyOtherApp):
 
     pass
+

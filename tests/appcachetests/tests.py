@@ -588,6 +588,17 @@ class FindAppTests(AppCacheTestCase):
         )
         self.assertRaises(ImproperlyConfigured, cache._populate)
 
+    def test_class_attribute(self):
+        """
+        Tests that class attributes of apps are correctly set in the
+        instances, not only the _meta options.
+        """
+        settings.INSTALLED_APPS = ('model_app.app.MyApp',)
+        cache._populate()
+        model_app = cache.find_app('model_app')
+        self.assertEquals(model_app._meta.db_prefix, 'model_app')
+        self.assertEquals(model_app.some_attribute, True)
+
 
 class SignalTests(AppCacheTestCase):
     """Tests for the signals"""

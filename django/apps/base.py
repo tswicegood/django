@@ -32,6 +32,9 @@ class AppBase(type):
         new_class.add_to_class('_meta', AppOptions(app_name, meta))
         # For easier Meta inheritance
         new_class.add_to_class('Meta', attr_meta)
+        # Add all remaining attributes to the class.
+        for obj_name, obj in attrs.items():
+            new_class.add_to_class(obj_name, obj)
         return new_class
 
     def add_to_class(cls, name, value):
