@@ -73,6 +73,9 @@ class BaseSettings(object):
         elif name == "ADMIN_MEDIA_PREFIX":
             warnings.warn("The ADMIN_MEDIA_PREFIX setting has been removed; "
                           "use STATIC_URL instead.", DeprecationWarning)
+        elif name == "ALLOWED_INCLUDE_ROOTS" and isinstance(value, basestring):
+            raise ValueError("The ALLOWED_INCLUDE_ROOTS setting must be set "
+                "to a tuple, not a string.")
         object.__setattr__(self, name, value)
 
 
@@ -98,26 +101,13 @@ class Settings(BaseSettings):
         for setting in dir(mod):
             if setting == setting.upper():
                 setting_value = getattr(mod, setting)
-                if setting in tuple_settings and type(setting_value) == str:
+                if setting in tuple_settings and \
+                        isinstance(setting_value, basestring):
                     setting_value = (setting_value,) # In case the user forgot the comma.
                 setattr(self, setting, setting_value)
 
-        # Expand entries in INSTALLED_APPS like "django.contrib.*" to a list
-        # of all those apps.
-        new_installed_apps = []
-        for app in self.INSTALLED_APPS:
-            if app.endswith('.*'):
-                app_mod = importlib.import_module(app[:-2])
-                appdir = os.path.dirname(app_mod.__file__)
-                app_subdirs = os.listdir(appdir)
-                app_subdirs.sort()
-                name_pattern = re.compile(r'[a-zA-Z]\w*')
-                for d in app_subdirs:
-                    if name_pattern.match(d) and os.path.isdir(os.path.join(appdir, d)):
-                        new_installed_apps.append('%s.%s' % (app[:-2], d))
-            else:
-                new_installed_apps.append(app)
-        self.INSTALLED_APPS = new_installed_apps
+        if not self.SECRET_KEY:
+            raise DeprecationWarning("The SECRET_KEY setting must not be empty.")
 
         if hasattr(time, 'tzset') and self.TIME_ZONE:
             # When we can, attempt to validate the timezone. If we can't find
@@ -199,13 +189,8 @@ def compat_patch_logging_config(logging_config):
         while filter_name in filters:
             filter_name = filter_name + "_"
 
-        def _callback(record):
-            from django.conf import settings
-            return not settings.DEBUG
-
         filters[filter_name] = {
-            "()": "django.utils.log.CallbackFilter",
-            "callback": _callback
-            }
+            "()": "django.utils.log.RequireDebugFalse",
+        }
 
         logging_config["handlers"]["mail_admins"]["filters"] = [filter_name]

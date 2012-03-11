@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import sys
 
 from django import forms
@@ -11,9 +13,8 @@ from django.views.decorators.debug import (sensitive_post_parameters,
                                            sensitive_variables)
 from django.utils.log import getLogger
 
-from regressiontests.views import BrokenException, except_args
-
-from models import Article
+from . import BrokenException, except_args
+from .models import Article
 
 
 def index_page(request):
@@ -148,7 +149,7 @@ def send_log(request, exc_info):
         ][0]
     orig_filters = admin_email_handler.filters
     admin_email_handler.filters = []
-    logger.error('Internal Server Error: %s' % request.path,
+    logger.error('Internal Server Error: %s', request.path,
         exc_info=exc_info,
         extra={
             'status_code': 500,

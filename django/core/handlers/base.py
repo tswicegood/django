@@ -136,7 +136,7 @@ class BaseHandler(object):
                     response = response.render()
 
             except http.Http404, e:
-                logger.warning('Not Found: %s' % request.path,
+                logger.warning('Not Found: %s', request.path,
                             extra={
                                 'status_code': 404,
                                 'request': request
@@ -152,10 +152,10 @@ class BaseHandler(object):
                         try:
                             response = self.handle_uncaught_exception(request, resolver, sys.exc_info())
                         finally:
-                            receivers = signals.got_request_exception.send(sender=self.__class__, request=request)
+                            signals.got_request_exception.send(sender=self.__class__, request=request)
             except exceptions.PermissionDenied:
                 logger.warning(
-                    'Forbidden (Permission denied): %s' % request.path,
+                    'Forbidden (Permission denied): %s', request.path,
                     extra={
                         'status_code': 403,
                         'request': request
@@ -168,14 +168,14 @@ class BaseHandler(object):
                         response = self.handle_uncaught_exception(request,
                             resolver, sys.exc_info())
                     finally:
-                        receivers = signals.got_request_exception.send(
+                        signals.got_request_exception.send(
                             sender=self.__class__, request=request)
             except SystemExit:
                 # Allow sys.exit() to actually exit. See tickets #1023 and #4701
                 raise
             except: # Handle everything else, including SuspiciousOperation, etc.
                 # Get the exception info now, in case another exception is thrown later.
-                receivers = signals.got_request_exception.send(sender=self.__class__, request=request)
+                signals.got_request_exception.send(sender=self.__class__, request=request)
                 response = self.handle_uncaught_exception(request, resolver, sys.exc_info())
         finally:
             # Reset URLconf for this thread on the way out for complete
@@ -188,7 +188,7 @@ class BaseHandler(object):
                 response = middleware_method(request, response)
             response = self.apply_response_fixes(request, response)
         except: # Any exception should be gathered and handled
-            receivers = signals.got_request_exception.send(sender=self.__class__, request=request)
+            signals.got_request_exception.send(sender=self.__class__, request=request)
             response = self.handle_uncaught_exception(request, resolver, sys.exc_info())
 
         return response
@@ -208,7 +208,7 @@ class BaseHandler(object):
         if settings.DEBUG_PROPAGATE_EXCEPTIONS:
             raise
 
-        logger.error('Internal Server Error: %s' % request.path,
+        logger.error('Internal Server Error: %s', request.path,
             exc_info=exc_info,
             extra={
                 'status_code': 500,
@@ -242,8 +242,8 @@ def get_script_name(environ):
     Returns the equivalent of the HTTP request's SCRIPT_NAME environment
     variable. If Apache mod_rewrite has been used, returns what would have been
     the script name prior to any rewriting (so it's the script name as seen
-    from the client's perspective), unless DJANGO_USE_POST_REWRITE is set (to
-    anything).
+    from the client's perspective), unless the FORCE_SCRIPT_NAME setting is
+    set (to anything).
     """
     from django.conf import settings
     if settings.FORCE_SCRIPT_NAME is not None:

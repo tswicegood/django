@@ -1,8 +1,11 @@
-from functools import update_wrapper
-from django.db import connection
-from django.test import TestCase, skipUnlessDBFeature
+from __future__ import absolute_import
 
-from models import Reporter, Article
+from functools import update_wrapper
+
+from django.db import connection
+from django.test import TestCase, skipUnlessDBFeature, skipIfDBFeature
+
+from .models import Reporter, Article
 
 #
 # The introspection module is optional, so methods tested here might raise
@@ -50,6 +53,17 @@ class IntrospectionTests(TestCase):
         self.assertTrue('django_ixn_testcase_table' not in tl,
                      "django_table_names() returned a non-Django table")
 
+    def test_django_table_names_retval_type(self):
+        # Ticket #15216
+        cursor = connection.cursor()
+        cursor.execute('CREATE TABLE django_ixn_test_table (id INTEGER);')
+
+        tl = connection.introspection.django_table_names(only_existing=True)
+        self.assertIs(type(tl), list)
+
+        tl = connection.introspection.django_table_names(only_existing=False)
+        self.assertIs(type(tl), list)
+
     def test_installed_models(self):
         tables = [Article._meta.db_table, Reporter._meta.db_table]
         models = connection.introspection.installed_models(tables)
@@ -73,6 +87,18 @@ class IntrospectionTests(TestCase):
         self.assertEqual(
             [datatype(r[1], r) for r in desc],
             ['IntegerField', 'CharField', 'CharField', 'CharField', 'BigIntegerField']
+        )
+
+    # Oracle forces null=True under the hood in some cases (see
+    # https://docs.djangoproject.com/en/dev/ref/databases/#null-and-empty-strings)
+    # so its idea about null_ok in cursor.description is different from ours.
+    @skipIfDBFeature('interprets_empty_strings_as_nulls')
+    def test_get_table_description_nullable(self):
+        cursor = connection.cursor()
+        desc = connection.introspection.get_table_description(cursor, Reporter._meta.db_table)
+        self.assertEqual(
+            [r[6] for r in desc],
+            [False, False, False, False, True]
         )
 
     # Regression test for #9991 - 'real' types in postgres

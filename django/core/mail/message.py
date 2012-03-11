@@ -2,13 +2,13 @@ import mimetypes
 import os
 import random
 import time
-from email import Charset, Encoders
+from email import charset as Charset, encoders as Encoders
 from email.generator import Generator
-from email.MIMEText import MIMEText
-from email.MIMEMultipart import MIMEMultipart
-from email.MIMEBase import MIMEBase
-from email.Header import Header
-from email.Utils import formatdate, getaddresses, formataddr, parseaddr
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.header import Header
+from email.utils import formatdate, getaddresses, formataddr, parseaddr
 
 from django.conf import settings
 from django.core.mail.utils import DNS_NAME
@@ -215,7 +215,7 @@ class EmailMessage(object):
         msg = self._create_message(msg)
         msg['Subject'] = self.subject
         msg['From'] = self.extra_headers.get('From', self.from_email)
-        msg['To'] = ', '.join(self.to)
+        msg['To'] = self.extra_headers.get('To', ', '.join(self.to))
         if self.cc:
             msg['Cc'] = ', '.join(self.cc)
 
@@ -227,7 +227,7 @@ class EmailMessage(object):
         if 'message-id' not in header_names:
             msg['Message-ID'] = make_msgid()
         for name, value in self.extra_headers.items():
-            if name.lower() == 'from':  # From is already handled
+            if name.lower() in ('from', 'to'):  # From and To are already handled
                 continue
             msg[name] = value
         return msg
@@ -311,6 +311,10 @@ class EmailMessage(object):
                 mimetype = DEFAULT_ATTACHMENT_MIME_TYPE
         attachment = self._create_mime_attachment(content, mimetype)
         if filename:
+            try:
+                filename = filename.encode('ascii')
+            except UnicodeEncodeError:
+                filename = ('utf-8', '', filename.encode('utf-8'))
             attachment.add_header('Content-Disposition', 'attachment',
                                   filename=filename)
         return attachment

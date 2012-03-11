@@ -1,6 +1,7 @@
 from functools import update_wrapper
 
-from django import apps, http
+from django import apps
+from django.http import Http404, HttpResponseRedirect
 from django.contrib.admin import ModelAdmin, actions
 from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth import REDIRECT_FIELD_NAME
@@ -8,7 +9,7 @@ from django.contrib.contenttypes import views as contenttype_views
 from django.views.decorators.csrf import csrf_protect
 from django.db.models.base import ModelBase
 from django.core.exceptions import ImproperlyConfigured
-from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse, NoReverseMatch
 from django.template.response import TemplateResponse
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
@@ -175,7 +176,7 @@ class AdminSite(object):
             class MyAdminSite(AdminSite):
 
                 def get_urls(self):
-                    from django.conf.urls.defaults import patterns, url
+                    from django.conf.urls import patterns, url
 
                     urls = super(MyAdminSite, self).get_urls()
                     urls += patterns('',
@@ -189,6 +190,10 @@ class AdminSite(object):
         """
         def inner(request, *args, **kwargs):
             if not self.has_permission(request):
+                if request.path == reverse('admin:logout',
+                                           current_app=self.name):
+                    index_path = reverse('admin:index', current_app=self.name)
+                    return HttpResponseRedirect(index_path)
                 return self.login(request)
             return view(request, *args, **kwargs)
         if not cacheable:
@@ -200,7 +205,7 @@ class AdminSite(object):
         return update_wrapper(inner, view)
 
     def get_urls(self):
-        from django.conf.urls.defaults import patterns, url, include
+        from django.conf.urls import patterns, url, include
 
         if settings.DEBUG:
             self.check_dependencies()
@@ -340,17 +345,27 @@ class AdminSite(object):
                 # Check whether user has any perm for this module.
                 # If so, add the module to the model_list.
                 if True in perms.values():
+                    info = (app_label, model._meta.module_name)
                     model_dict = {
                         'name': capfirst(model._meta.verbose_name_plural),
-                        'admin_url': mark_safe('%s/%s/' % (app_label, model.__name__.lower())),
                         'perms': perms,
                     }
+                    if perms.get('change', False):
+                        try:
+                            model_dict['admin_url'] = reverse('admin:%s_%s_changelist' % info, current_app=self.name)
+                        except NoReverseMatch:
+                            pass
+                    if perms.get('add', False):
+                        try:
+                            model_dict['add_url'] = reverse('admin:%s_%s_add' % info, current_app=self.name)
+                        except NoReverseMatch:
+                            pass
                     if app_label in app_dict:
                         app_dict[app_label]['models'].append(model_dict)
                     else:
                         app_dict[app_label] = {
                             'name': apps.find_app(app_label)._meta.verbose_name,
-                            'app_url': app_label + '/',
+                            'app_url': reverse('admin:app_list', kwargs={'app_label': app_label}, current_app=self.name),
                             'has_module_perms': has_module_perms,
                             'models': [model_dict],
                         }
@@ -385,11 +400,21 @@ class AdminSite(object):
                     # Check whether user has any perm for this module.
                     # If so, add the module to the model_list.
                     if True in perms.values():
+                        info = (app_label, model._meta.module_name)
                         model_dict = {
                             'name': capfirst(model._meta.verbose_name_plural),
-                            'admin_url': '%s/' % model.__name__.lower(),
                             'perms': perms,
                         }
+                        if perms.get('change', False):
+                            try:
+                                model_dict['admin_url'] = reverse('admin:%s_%s_changelist' % info, current_app=self.name)
+                            except NoReverseMatch:
+                                pass
+                        if perms.get('add', False):
+                            try:
+                                model_dict['add_url'] = reverse('admin:%s_%s_add' % info, current_app=self.name)
+                            except NoReverseMatch:
+                                pass
                         if app_dict:
                             app_dict['models'].append(model_dict),
                         else:
@@ -403,7 +428,7 @@ class AdminSite(object):
                                 'models': [model_dict],
                             }
         if not app_dict:
-            raise http.Http404('The requested admin page does not exist.')
+            raise Http404('The requested admin page does not exist.')
         # Sort the models alphabetically within each app.
         app_dict['models'].sort(key=lambda x: x['name'])
         context = {

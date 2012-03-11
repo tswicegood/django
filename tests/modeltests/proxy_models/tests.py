@@ -1,16 +1,17 @@
-from django.test import TestCase
-from django.db import models, DEFAULT_DB_ALIAS
-from django.db.models import signals
-from django.core import management
-from django.core.exceptions import FieldError
+from __future__ import absolute_import
 
 from django.contrib.contenttypes.models import ContentType
+from django.core import management
+from django.core.exceptions import FieldError
+from django.db import models, DEFAULT_DB_ALIAS
+from django.db.models import signals
+from django.test import TestCase
 
-from models import MyPerson, Person, StatusPerson, LowerStatusPerson
-from models import MyPersonProxy, Abstract, OtherPerson, User, UserProxy
-from models import UserProxyProxy, Country, State, StateProxy, TrackerUser
-from models import BaseUser, Bug, ProxyTrackerUser, Improvement, ProxyProxyBug
-from models import ProxyBug, ProxyImprovement
+
+from .models import (MyPerson, Person, StatusPerson, LowerStatusPerson,
+    MyPersonProxy, Abstract, OtherPerson, User, UserProxy, UserProxyProxy,
+    Country, State, StateProxy, TrackerUser, BaseUser, Bug, ProxyTrackerUser,
+    Improvement, ProxyProxyBug, ProxyBug, ProxyImprovement)
 
 class ProxyModelTests(TestCase):
     def test_same_manager_queries(self):
@@ -230,6 +231,12 @@ class ProxyModelTests(TestCase):
 
         resp = [u.name for u in UserProxyProxy.objects.all()]
         self.assertEqual(resp, ['Bruce'])
+
+    def test_proxy_for_model(self):
+        self.assertEqual(UserProxy, UserProxyProxy._meta.proxy_for_model)
+
+    def test_concrete_model(self):
+        self.assertEqual(User, UserProxyProxy._meta.concrete_model)
 
     def test_proxy_delete(self):
         """

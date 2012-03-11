@@ -1,10 +1,13 @@
+from __future__ import absolute_import, with_statement
+
 from copy import deepcopy
 from datetime import datetime
 
-from django.test import TestCase
 from django.core.exceptions import MultipleObjectsReturned
+from django.test import TestCase
+from django.utils.translation import ugettext_lazy
 
-from models import Article, Reporter
+from .models import Article, Reporter
 
 
 class ManyToOneTests(TestCase):
@@ -66,7 +69,8 @@ class ManyToOneTests(TestCase):
         self.assertQuerysetEqual(self.r2.article_set.all(), ["<Article: Paul's story>"])
 
         # Adding an object of the wrong type raises TypeError.
-        self.assertRaises(TypeError, self.r.article_set.add, self.r2)
+        with self.assertRaisesRegexp(TypeError, "'Article' instance expected, got <Reporter.*"):
+            self.r.article_set.add(self.r2)
         self.assertQuerysetEqual(self.r.article_set.all(),
             [
                 "<Article: John's second story>",
@@ -399,3 +403,24 @@ class ManyToOneTests(TestCase):
         self.assertEqual(repr(a3),
                          repr(Article.objects.get(reporter_id=self.r2.id,
                                              pub_date=datetime(2011, 5, 7))))
+
+    def test_manager_class_caching(self):
+        r1 = Reporter.objects.create(first_name='Mike')
+        r2 = Reporter.objects.create(first_name='John')
+
+        # Same twice
+        self.assertTrue(r1.article_set.__class__ is r1.article_set.__class__)
+
+        # Same as each other
+        self.assertTrue(r1.article_set.__class__ is r2.article_set.__class__)
+
+    def test_create_relation_with_ugettext_lazy(self):
+        reporter = Reporter.objects.create(first_name='John',
+                                           last_name='Smith',
+                                           email='john.smith@example.com')
+        lazy = ugettext_lazy(u'test')
+        reporter.article_set.create(headline=lazy,
+                                    pub_date=datetime(2011, 6, 10))
+        notlazy = unicode(lazy)
+        article = reporter.article_set.get()
+        self.assertEqual(article.headline, notlazy)

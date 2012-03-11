@@ -6,7 +6,8 @@ import copy
 import pickle
 
 from django.test import SimpleTestCase
-from django.utils.datastructures import *
+from django.utils.datastructures import (DictWrapper, DotExpandedDict,
+    ImmutableList, MultiValueDict, MultiValueDictKeyError, MergeDict, SortedDict)
 
 
 class SortedDictTests(SimpleTestCase):
@@ -204,6 +205,12 @@ class MultiValueDictTests(SimpleTestCase):
         self.assertEqual(d.values(), ['Developer', 'Simon', 'Willison'])
         self.assertEqual(list(d.itervalues()),
                           ['Developer', 'Simon', 'Willison'])
+
+    def test_appendlist(self):
+        d = MultiValueDict()
+        d.appendlist('name', 'Adrian')
+        d.appendlist('name', 'Simon')
+        self.assertEqual(d.getlist('name'), ['Adrian', 'Simon'])
 
     def test_copy(self):
         for copy_func in [copy.copy, lambda d: d.copy()]:

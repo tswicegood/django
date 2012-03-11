@@ -14,6 +14,8 @@ import django.template.context
 from django.test import Client, TestCase
 from django.test.client import encode_file, RequestFactory
 from django.test.utils import ContextList, override_settings
+from django.template.response import SimpleTemplateResponse
+from django.http import HttpResponse
 
 
 class AssertContainsTests(TestCase):
@@ -130,6 +132,37 @@ class AssertContainsTests(TestCase):
         self.assertNotContains(r, u'はたけ')
         self.assertNotContains(r, '\xe3\x81\xaf\xe3\x81\x9f\xe3\x81\x91'.decode('utf-8'))
 
+    def test_assert_contains_renders_template_response(self):
+        """ Test that we can pass in an unrendered SimpleTemplateReponse
+            without throwing an error.
+            Refs #15826.
+        """
+        response = SimpleTemplateResponse(Template('Hello'), status=200)
+        self.assertContains(response, 'Hello')
+
+    def test_assert_contains_using_non_template_response(self):
+        """ Test that auto-rendering does not affect responses that aren't
+            instances (or subclasses) of SimpleTemplateResponse.
+            Refs #15826.
+        """
+        response = HttpResponse('Hello')
+        self.assertContains(response, 'Hello')
+
+    def test_assert_not_contains_renders_template_response(self):
+        """ Test that we can pass in an unrendered SimpleTemplateReponse
+            without throwing an error.
+            Refs #15826.
+        """
+        response = SimpleTemplateResponse(Template('Hello'), status=200)
+        self.assertNotContains(response, 'Bye')
+
+    def test_assert_not_contains_using_non_template_response(self):
+        """ Test that auto-rendering does not affect responses that aren't
+            instances (or subclasses) of SimpleTemplateResponse.
+            Refs #15826.
+        """
+        response = HttpResponse('Hello')
+        self.assertNotContains(response, 'Bye')
 
 class AssertTemplateUsedTests(TestCase):
     fixtures = ['testdata.json']
@@ -334,6 +367,18 @@ class AssertRedirectsTests(TestCase):
         self.assertRedirects(response,
             '/test_client_regress/no_template_view/', 301, 200)
         self.assertEqual(len(response.redirect_chain), 3)
+
+    def test_redirect_to_different_host(self):
+        "The test client will preserve scheme, host and port changes"
+        response = self.client.get('/test_client_regress/redirect_other_host/', follow=True)
+        self.assertRedirects(response,
+            'https://otherserver:8443/test_client_regress/no_template_view/',
+            status_code=301, target_status_code=200)
+        # We can't use is_secure() or get_host()
+        # because response.request is a dictionary, not an HttpRequest
+        self.assertEqual(response.request.get('wsgi.url_scheme'), 'https')
+        self.assertEqual(response.request.get('SERVER_NAME'), 'otherserver')
+        self.assertEqual(response.request.get('SERVER_PORT'), '8443')
 
     def test_redirect_chain_on_non_redirect_page(self):
         "An assertion is raised if the original page couldn't be retrieved as expected"
@@ -770,7 +815,9 @@ class RequestMethodStringDataTests(TestCase):
 
 class QueryStringTests(TestCase):
     def test_get_like_requests(self):
-        for method_name in ('get','head','options','put','delete'):
+        # See: https://code.djangoproject.com/ticket/10571.
+        # Removed 'put' and 'delete' here as they are 'GET-like requests'
+        for method_name in ('get','head','options'):
             # A GET-like request can pass a query string as data
             method = getattr(self.client, method_name)
             response = method("/test_client_regress/request_data/", data={'foo':'whiz'})
@@ -827,12 +874,18 @@ class UnicodePayloadTests(TestCase):
         response = self.client.post("/test_client_regress/parse_unicode_json/", json,
                                     content_type="application/json")
         self.assertEqual(response.content, json)
+        response = self.client.put("/test_client_regress/parse_unicode_json/", json,
+                                    content_type="application/json")
+        self.assertEqual(response.content, json)
 
     def test_unicode_payload_utf8(self):
         "A non-ASCII unicode data encoded as UTF-8 can be POSTed"
         # Regression test for #10571
         json = u'{"dog": "собака"}'
         response = self.client.post("/test_client_regress/parse_unicode_json/", json,
+                                    content_type="application/json; charset=utf-8")
+        self.assertEqual(response.content, json.encode('utf-8'))
+        response = self.client.put("/test_client_regress/parse_unicode_json/", json,
                                     content_type="application/json; charset=utf-8")
         self.assertEqual(response.content, json.encode('utf-8'))
 
@@ -843,12 +896,18 @@ class UnicodePayloadTests(TestCase):
         response = self.client.post("/test_client_regress/parse_unicode_json/", json,
                                     content_type="application/json; charset=utf-16")
         self.assertEqual(response.content, json.encode('utf-16'))
+        response = self.client.put("/test_client_regress/parse_unicode_json/", json,
+                                    content_type="application/json; charset=utf-16")
+        self.assertEqual(response.content, json.encode('utf-16'))
 
     def test_unicode_payload_non_utf(self):
         "A non-ASCII unicode data as a non-UTF based encoding can be POSTed"
         #Regression test for #10571
         json = u'{"dog": "собака"}'
         response = self.client.post("/test_client_regress/parse_unicode_json/", json,
+                                    content_type="application/json; charset=koi8-r")
+        self.assertEqual(response.content, json.encode('koi8-r'))
+        response = self.client.put("/test_client_regress/parse_unicode_json/", json,
                                     content_type="application/json; charset=koi8-r")
         self.assertEqual(response.content, json.encode('koi8-r'))
 
@@ -916,15 +975,16 @@ class ResponseTemplateDeprecationTests(TestCase):
 
 class ReadLimitedStreamTest(TestCase):
     """
-    Tests that ensure that HttpRequest.raw_post_data, HttpRequest.read() and
-    HttpRequest.read(BUFFER) have proper LimitedStream behaviour.
+    Tests that ensure that HttpRequest.body, HttpRequest.read() and
+    HttpRequest.read(BUFFER) have proper LimitedStream behavior.
 
     Refs #14753, #15785
     """
-    def test_raw_post_data_from_empty_request(self):
-        """HttpRequest.raw_post_data on a test client GET request should return
+
+    def test_body_from_empty_request(self):
+        """HttpRequest.body on a test client GET request should return
         the empty string."""
-        self.assertEquals(self.client.get("/test_client_regress/raw_post_data/").content, '')
+        self.assertEquals(self.client.get("/test_client_regress/body/").content, '')
 
     def test_read_from_empty_request(self):
         """HttpRequest.read() on a test client GET request should return the
@@ -957,7 +1017,7 @@ class RequestFactoryStateTest(TestCase):
     """Regression tests for #15929."""
     # These tests are checking that certain middleware don't change certain
     # global state. Alternatively, from the point of view of a test, they are
-    # ensuring test isolation behaviour. So, unusually, it doesn't make sense to
+    # ensuring test isolation behavior. So, unusually, it doesn't make sense to
     # run the tests individually, and if any are failing it is confusing to run
     # them with any other set of tests.
 
@@ -980,3 +1040,23 @@ class RequestFactoryStateTest(TestCase):
     def test_request_after_client_2(self):
         # This test is executed after the previous one
         self.common_test_that_should_always_pass()
+
+
+class RequestFactoryEnvironmentTests(TestCase):
+    """
+    Regression tests for #8551 and #17067: ensure that environment variables
+    are set correctly in RequestFactory.
+    """
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_should_set_correct_env_variables(self):
+        request = self.factory.get('/path/')
+
+        self.assertEqual(request.META.get('REMOTE_ADDR'), '127.0.0.1')
+        self.assertEqual(request.META.get('SERVER_NAME'), 'testserver')
+        self.assertEqual(request.META.get('SERVER_PORT'), '80')
+        self.assertEqual(request.META.get('SERVER_PROTOCOL'), 'HTTP/1.1')
+        self.assertEqual(request.META.get('SCRIPT_NAME') +
+                         request.META.get('PATH_INFO'), '/path/')

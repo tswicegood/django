@@ -20,7 +20,7 @@ from django.db.models.options import Options
 from django.db.models import signals
 from django.db.models.loading import register_models, get_model
 from django.utils.translation import ugettext_lazy as _
-from django.utils.functional import curry
+from django.utils.functional import curry, Promise
 from django.utils.encoding import smart_str, force_unicode
 from django.utils.text import get_text_list, capfirst
 
@@ -122,9 +122,10 @@ class ModelBase(type):
             if (new_class._meta.local_fields or
                     new_class._meta.local_many_to_many):
                 raise FieldError("Proxy model '%s' contains model fields." % name)
-            while base._meta.proxy:
-                base = base._meta.proxy_for_model
             new_class._meta.setup_proxy(base)
+            new_class._meta.concrete_model = base._meta.concrete_model
+        else:
+            new_class._meta.concrete_model = new_class
 
         # Do the appropriate setup for any model parents.
         o2o_map = dict([(f.rel.to, f) for f in new_class._meta.local_fields
@@ -149,9 +150,7 @@ class ModelBase(type):
                                         (field.name, name, base.__name__))
             if not base._meta.abstract:
                 # Concrete classes...
-                while base._meta.proxy:
-                    # Skip over a proxy class to the "real" base it proxies.
-                    base = base._meta.proxy_for_model
+                base = base._meta.concrete_model
                 if base in o2o_map:
                     field = o2o_map[base]
                 elif not is_proxy:
@@ -298,10 +297,14 @@ class Model(object):
             # is *not* consumed. We rely on this, so don't change the order
             # without changing the logic.
             for val, field in izip(args, fields_iter):
+                if isinstance(val, Promise):
+                    val = force_unicode(val)
                 setattr(self, field.attname, val)
         else:
             # Slower, kwargs-ready version.
             for val, field in izip(args, fields_iter):
+                if isinstance(val, Promise):
+                    val = force_unicode(val)
                 setattr(self, field.attname, val)
                 kwargs.pop(field.name, None)
                 # Maintain compatibility with existing calls.
@@ -355,6 +358,8 @@ class Model(object):
                 # checked) by the RelatedObjectDescriptor.
                 setattr(self, field.name, rel_obj)
             else:
+                if isinstance(val, Promise):
+                    val = force_unicode(val)
                 setattr(self, field.attname, val)
 
         if kwargs:
@@ -474,7 +479,6 @@ class Model(object):
         ('raw', 'cls', and 'origin').
         """
         using = using or router.db_for_write(self.__class__, instance=self)
-        connection = connections[using]
         assert not (force_insert and force_update)
         if cls is None:
             cls = self.__class__
@@ -527,9 +531,10 @@ class Model(object):
                     # It does already exist, so do an UPDATE.
                     if force_update or non_pks:
                         values = [(f, None, (raw and getattr(self, f.attname) or f.pre_save(self, False))) for f in non_pks]
-                        rows = manager.using(using).filter(pk=pk_val)._update(values)
-                        if force_update and not rows:
-                            raise DatabaseError("Forced update did not affect any rows.")
+                        if values:
+                            rows = manager.using(using).filter(pk=pk_val)._update(values)
+                            if force_update and not rows:
+                                raise DatabaseError("Forced update did not affect any rows.")
                 else:
                     record_exists = False
             if not pk_set or not record_exists:
@@ -540,24 +545,16 @@ class Model(object):
                     order_value = manager.using(using).filter(**{field.name: getattr(self, field.attname)}).count()
                     self._order = order_value
 
+                fields = meta.local_fields
                 if not pk_set:
                     if force_update:
                         raise ValueError("Cannot force an update in save() with no primary key.")
-                    values = [(f, f.get_db_prep_save(raw and getattr(self, f.attname) or f.pre_save(self, True), connection=connection))
-                        for f in meta.local_fields if not isinstance(f, AutoField)]
-                else:
-                    values = [(f, f.get_db_prep_save(raw and getattr(self, f.attname) or f.pre_save(self, True), connection=connection))
-                        for f in meta.local_fields]
+                    fields = [f for f in fields if not isinstance(f, AutoField)]
 
                 record_exists = False
 
                 update_pk = bool(meta.has_auto_field and not pk_set)
-                if values:
-                    # Create a new record.
-                    result = manager._insert(values, return_id=update_pk, using=using)
-                else:
-                    # Create a new record with defaults for everything.
-                    result = manager._insert([(meta.pk, connection.ops.pk_default_value())], return_id=update_pk, raw_values=True, using=using)
+                result = manager._insert([self], fields=fields, return_id=update_pk, using=using, raw=raw)
 
                 if update_pk:
                     setattr(self, meta.pk.attname, result)

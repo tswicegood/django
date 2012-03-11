@@ -115,7 +115,10 @@ class override(object):
         self.old_language = get_language()
 
     def __enter__(self):
-        activate(self.language)
+        if self.language is not None:
+            activate(self.language)
+        else:
+            deactivate_all()
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.deactivate:
@@ -141,8 +144,8 @@ def check_for_language(lang_code):
 def to_locale(language):
     return _trans.to_locale(language)
 
-def get_language_from_request(request):
-    return _trans.get_language_from_request(request)
+def get_language_from_request(request, check_path=False):
+    return _trans.get_language_from_request(request, check_path)
 
 def get_language_from_path(path):
     return _trans.get_language_from_path(path)

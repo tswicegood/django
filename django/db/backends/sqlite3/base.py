@@ -7,6 +7,7 @@ standard library.
 
 import datetime
 import decimal
+import warnings
 import re
 import sys
 
@@ -16,7 +17,9 @@ from django.db.backends.signals import connection_created
 from django.db.backends.sqlite3.client import DatabaseClient
 from django.db.backends.sqlite3.creation import DatabaseCreation
 from django.db.backends.sqlite3.introspection import DatabaseIntrospection
+from django.utils.dateparse import parse_date, parse_datetime, parse_time
 from django.utils.safestring import SafeString
+from django.utils import timezone
 
 try:
     try:
@@ -31,22 +34,42 @@ except ImportError, exc:
 DatabaseError = Database.DatabaseError
 IntegrityError = Database.IntegrityError
 
+def parse_datetime_with_timezone_support(value):
+    dt = parse_datetime(value)
+    # Confirm that dt is naive before overwriting its tzinfo.
+    if dt is not None and settings.USE_TZ and timezone.is_naive(dt):
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+def adapt_datetime_with_timezone_support(value):
+    # Equivalent to DateTimeField.get_db_prep_value. Used only by raw SQL.
+    if settings.USE_TZ:
+        if timezone.is_naive(value):
+            warnings.warn(u"SQLite received a naive datetime (%s)"
+                          u" while time zone support is active." % value,
+                          RuntimeWarning)
+            default_timezone = timezone.get_default_timezone()
+            value = timezone.make_aware(value, default_timezone)
+        value = value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value.isoformat(" ")
+
 Database.register_converter("bool", lambda s: str(s) == '1')
-Database.register_converter("time", util.typecast_time)
-Database.register_converter("date", util.typecast_date)
-Database.register_converter("datetime", util.typecast_timestamp)
-Database.register_converter("timestamp", util.typecast_timestamp)
-Database.register_converter("TIMESTAMP", util.typecast_timestamp)
+Database.register_converter("time", parse_time)
+Database.register_converter("date", parse_date)
+Database.register_converter("datetime", parse_datetime_with_timezone_support)
+Database.register_converter("timestamp", parse_datetime_with_timezone_support)
+Database.register_converter("TIMESTAMP", parse_datetime_with_timezone_support)
 Database.register_converter("decimal", util.typecast_decimal)
+Database.register_adapter(datetime.datetime, adapt_datetime_with_timezone_support)
 Database.register_adapter(decimal.Decimal, util.rev_typecast_decimal)
-if Database.version_info >= (2,4,1):
+if Database.version_info >= (2, 4, 1):
     # Starting in 2.4.1, the str type is not accepted anymore, therefore,
     # we convert all str objects to Unicode
     # As registering a adapter for a primitive type causes a small
     # slow-down, this adapter is only registered for sqlite3 versions
-    # needing it.
-    Database.register_adapter(str, lambda s:s.decode('utf-8'))
-    Database.register_adapter(SafeString, lambda s:s.decode('utf-8'))
+    # needing it (Python 2.6 and up).
+    Database.register_adapter(str, lambda s: s.decode('utf-8'))
+    Database.register_adapter(SafeString, lambda s: s.decode('utf-8'))
 
 class DatabaseFeatures(BaseDatabaseFeatures):
     # SQLite cannot handle us only partially reading from a cursor's result set
@@ -56,8 +79,11 @@ class DatabaseFeatures(BaseDatabaseFeatures):
     can_use_chunked_reads = False
     test_db_allows_multiple_connections = False
     supports_unspecified_pk = True
+    supports_timezones = False
     supports_1000_query_parameters = False
     supports_mixed_date_datetime_comparisons = False
+    has_bulk_insert = True
+    can_combine_inserts_with_and_without_auto_increment_pk = True
 
     def _supports_stddev(self):
         """Confirm support for STDDEV and related stats functions
@@ -106,7 +132,7 @@ class DatabaseOperations(BaseDatabaseOperations):
         return ""
 
     def pk_default_value(self):
-        return 'NULL'
+        return "NULL"
 
     def quote_name(self, name):
         if name.startswith('"') and name.endswith('"'):
@@ -129,6 +155,29 @@ class DatabaseOperations(BaseDatabaseOperations):
         # sql_flush() implementations). Just return SQL at this point
         return sql
 
+    def value_to_db_datetime(self, value):
+        if value is None:
+            return None
+
+        # SQLite doesn't support tz-aware datetimes
+        if timezone.is_aware(value):
+            if settings.USE_TZ:
+                value = value.astimezone(timezone.utc).replace(tzinfo=None)
+            else:
+                raise ValueError("SQLite backend does not support timezone-aware datetimes when USE_TZ is False.")
+
+        return unicode(value)
+
+    def value_to_db_time(self, value):
+        if value is None:
+            return None
+
+        # SQLite doesn't support tz-aware datetimes
+        if timezone.is_aware(value):
+            raise ValueError("SQLite backend does not support timezone-aware times.")
+
+        return unicode(value)
+
     def year_lookup_bounds(self, value):
         first = '%s-01-01'
         second = '%s-12-31 23:59:59.999999'
@@ -145,14 +194,22 @@ class DatabaseOperations(BaseDatabaseOperations):
         elif internal_type and internal_type.endswith('IntegerField') or internal_type == 'AutoField':
             return int(value)
         elif internal_type == 'DateField':
-            return util.typecast_date(value)
+            return parse_date(value)
         elif internal_type == 'DateTimeField':
-            return util.typecast_timestamp(value)
+            return parse_datetime_with_timezone_support(value)
         elif internal_type == 'TimeField':
-            return util.typecast_time(value)
+            return parse_time(value)
 
         # No field, or the field isn't known to be a decimal or integer
         return value
+
+    def bulk_insert_sql(self, fields, num_values):
+        res = []
+        res.append("SELECT %s" % ", ".join(
+            "%%s AS %s" % self.quote_name(f.column) for f in fields
+        ))
+        res.extend(["UNION SELECT %s" % ", ".join(["%s"] * len(fields))] * (num_values - 1))
+        return " ".join(res)
 
 class DatabaseWrapper(BaseDatabaseWrapper):
     vendor = 'sqlite'
@@ -186,24 +243,42 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         self.introspection = DatabaseIntrospection(self)
         self.validation = BaseDatabaseValidation(self)
 
+    def _sqlite_create_connection(self):
+        settings_dict = self.settings_dict
+        if not settings_dict['NAME']:
+            from django.core.exceptions import ImproperlyConfigured
+            raise ImproperlyConfigured("Please fill out the database NAME in the settings module before using the database.")
+        kwargs = {
+            'database': settings_dict['NAME'],
+            'detect_types': Database.PARSE_DECLTYPES | Database.PARSE_COLNAMES,
+        }
+        kwargs.update(settings_dict['OPTIONS'])
+        # Always allow the underlying SQLite connection to be shareable
+        # between multiple threads. The safe-guarding will be handled at a
+        # higher level by the `BaseDatabaseWrapper.allow_thread_sharing`
+        # property. This is necessary as the shareability is disabled by
+        # default in pysqlite and it cannot be changed once a connection is
+        # opened.
+        if 'check_same_thread' in kwargs and kwargs['check_same_thread']:
+            warnings.warn(
+                'The `check_same_thread` option was provided and set to '
+                'True. It will be overriden with False. Use the '
+                '`DatabaseWrapper.allow_thread_sharing` property instead '
+                'for controlling thread shareability.',
+                RuntimeWarning
+            )
+        kwargs.update({'check_same_thread': False})
+        self.connection = Database.connect(**kwargs)
+        # Register extract, date_trunc, and regexp functions.
+        self.connection.create_function("django_extract", 2, _sqlite_extract)
+        self.connection.create_function("django_date_trunc", 2, _sqlite_date_trunc)
+        self.connection.create_function("regexp", 2, _sqlite_regexp)
+        self.connection.create_function("django_format_dtdelta", 5, _sqlite_format_dtdelta)
+        connection_created.send(sender=self.__class__, connection=self)
+
     def _cursor(self):
         if self.connection is None:
-            settings_dict = self.settings_dict
-            if not settings_dict['NAME']:
-                from django.core.exceptions import ImproperlyConfigured
-                raise ImproperlyConfigured("Please fill out the database NAME in the settings module before using the database.")
-            kwargs = {
-                'database': settings_dict['NAME'],
-                'detect_types': Database.PARSE_DECLTYPES | Database.PARSE_COLNAMES,
-            }
-            kwargs.update(settings_dict['OPTIONS'])
-            self.connection = Database.connect(**kwargs)
-            # Register extract, date_trunc, and regexp functions.
-            self.connection.create_function("django_extract", 2, _sqlite_extract)
-            self.connection.create_function("django_date_trunc", 2, _sqlite_date_trunc)
-            self.connection.create_function("regexp", 2, _sqlite_regexp)
-            self.connection.create_function("django_format_dtdelta", 5, _sqlite_format_dtdelta)
-            connection_created.send(sender=self.__class__, connection=self)
+            self._sqlite_create_connection()
         return self.connection.cursor(factory=SQLiteCursorWrapper)
 
     def check_constraints(self, table_names=None):
@@ -241,6 +316,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
                         referenced_table_name, referenced_column_name))
 
     def close(self):
+        self.validate_thread_sharing()
         # If database is in memory, closing the connection destroys the
         # database. To prevent accidental data loss, ignore close requests on
         # an in-memory db.
@@ -310,17 +386,11 @@ def _sqlite_format_dtdelta(dt, conn, days, secs, usecs):
             dt = dt - delta
     except (ValueError, TypeError):
         return None
-
-    if isinstance(dt, datetime.datetime):
-        rv = dt.strftime("%Y-%m-%d %H:%M:%S")
-        if dt.microsecond:
-            rv = "%s.%0.6d" % (rv, dt.microsecond)
-    else:
-        rv = dt.strftime("%Y-%m-%d")
-    return rv
+    # typecast_timestamp returns a date or a datetime without timezone.
+    # It will be formatted as "%Y-%m-%d" or "%Y-%m-%d %H:%M:%S[.%f]"
+    return str(dt)
 
 def _sqlite_regexp(re_pattern, re_string):
-    import re
     try:
         return bool(re.search(re_pattern, re_string))
     except:

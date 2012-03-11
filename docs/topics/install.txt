@@ -24,6 +24,15 @@ probably already have it installed.
 
 .. _jython: http://jython.org/
 
+.. admonition:: Python on Windows
+
+    On Windows, you might need to adjust your ``PATH`` environment variable
+    to include paths to Python executable and additional scripts. For example,
+    if your Python is installed in ``C:\Python27\``, the following paths need
+    to be added to ``PATH``::
+
+        C:\Python27\;C:\Python27\Scripts;
+
 Install Apache and mod_wsgi
 =============================
 
@@ -48,23 +57,21 @@ documentation to determine which mode is right for your setup. Make
 sure you have Apache installed, with the mod_wsgi module activated.
 Django will work with any version of Apache that supports mod_wsgi.
 
-See :doc:`How to use Django with mod_wsgi </howto/deployment/modwsgi>`
+See :doc:`How to use Django with mod_wsgi </howto/deployment/wsgi/modwsgi>`
 for information on how to configure mod_wsgi once you have it
 installed.
 
-If you can't use mod_wsgi for some reason, fear not: Django supports
-many other deployment options. One is :doc:`uWSGI </howto/deployment/fastcgi>`;
-it works very well with `nginx`_. Another is :doc:`FastCGI
-</howto/deployment/fastcgi>`, perfect for using Django with servers
-other than Apache. Additionally, Django follows the WSGI_ spec, which
-allows it to run on a variety of server platforms. See the
-`server-arrangements wiki page`_ for specific installation
-instructions for each platform.
+If you can't use mod_wsgi for some reason, fear not: Django supports many other
+deployment options. One is :doc:`uWSGI </howto/deployment/fastcgi>`; it works
+very well with `nginx`_. Another is :doc:`FastCGI </howto/deployment/fastcgi>`,
+perfect for using Django with servers other than Apache. Additionally, Django
+follows the WSGI spec (:pep:`3333`), which allows it to run on a variety of
+server platforms. See the `server-arrangements wiki page`_ for specific
+installation instructions for each platform.
 
 .. _Apache: http://httpd.apache.org/
 .. _nginx: http://nginx.net/
 .. _mod_wsgi: http://code.google.com/p/modwsgi/
-.. _WSGI: http://www.python.org/dev/peps/pep-0333/
 .. _server-arrangements wiki page: http://code.djangoproject.com/wiki/ServerArrangements
 
 .. _database-installation:
@@ -170,6 +177,12 @@ This file should also be located in your ``site-packages`` directory.
     (Note that this should be run from a shell prompt, not a Python interactive
     prompt.)
 
+    Some Debian-based Linux distributions have separate ``site-packages``
+    directories for user-installed packages, such as when installing Django
+    from a downloaded tarball. The command  listed above will give you the
+    system's ``site-packages``, the user's directory can be found in
+    ``/usr/local/lib/`` instead of ``/usr/lib/``.
+
 .. _install-django-code:
 
 Install the Django code
@@ -184,33 +197,62 @@ It's easy, no matter which way you choose.
 Installing a distribution-specific package
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Check the :doc:`distribution specific notes </misc/distributions>` to see if your
-platform/distribution provides official Django packages/installers.
+Check the :doc:`distribution specific notes </misc/distributions>` to see if
+your platform/distribution provides official Django packages/installers.
 Distribution-provided packages will typically allow for automatic installation
 of dependencies and easy upgrade paths.
 
 .. _installing-official-release:
 
-Installing an official release
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Installing an official release with ``pip``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    1. Download the latest release from our `download page`_.
+This is the recommended way to install Django.
 
-    2. Untar the downloaded file (e.g. ``tar xzvf Django-NNN.tar.gz``,
-       where ``NNN`` is the version number of the latest release).
-       If you're using Windows, you can download the command-line tool
-       bsdtar_ to do this, or you can use a GUI-based tool such as 7-zip_.
+1. Install pip_. The easiest is to use the `standalone pip installer`_. If your
+   distribution has ``pip`` already installed, make sure it isn't too outdated.
 
-    3. Change into the directory created in step 2 (e.g. ``cd Django-NNN``).
+2. (optional) Take a look at virtualenv_ and virtualenvwrapper_. These tools
+   provide isolated Python environments, which are more practical than
+   installing packages system-wide. They also allow installing packages
+   without administrator privileges. It's up to you to decide if you want to
+   learn and use them.
 
-    4. If you're using Linux, Mac OS X or some other flavor of Unix, enter
-       the command ``sudo python setup.py install`` at the shell prompt.
-       If you're using Windows, start up a command shell with administrator
-       privileges and run the command ``setup.py install``.
+3. If you're using Linux, Mac OS X or some other flavor of Unix, enter the
+   command ``sudo pip install Django`` at the shell prompt. If you're using
+   Windows, start up a command shell with administrator privileges and run
+   the command ``pip install Django``. This will install Django in your Python
+   installation's ``site-packages`` directory.
 
-These commands will install Django in your Python installation's
-``site-packages`` directory.
+   If you're using a virtualenv, you don't need ``sudo`` or administrator
+   privileges, and this will install Django in the virtualenv's
+   ``site-packages`` directory.
 
+
+.. _pip: http://www.pip-installer.org/
+.. _virtualenv: http://www.virtualenv.org/
+.. _virtualenvwrapper: http://www.doughellmann.com/docs/virtualenvwrapper/
+.. _standalone pip installer: http://www.pip-installer.org/en/latest/installing.html#using-the-installer
+
+Installing an official release manually
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. Download the latest release from our `download page`_.
+
+2. Untar the downloaded file (e.g. ``tar xzvf Django-X.Y.tar.gz``,
+   where ``X.Y`` is the version number of the latest release).
+   If you're using Windows, you can download the command-line tool
+   bsdtar_ to do this, or you can use a GUI-based tool such as 7-zip_.
+
+3. Change into the directory created in step 2 (e.g. ``cd Django-X.Y``).
+
+4. If you're using Linux, Mac OS X or some other flavor of Unix, enter the
+   command ``sudo python setup.py install`` at the shell prompt. If you're
+   using Windows, start up a command shell with administrator privileges and
+   run the command ``python setup.py install``. This will install Django in
+   your Python installation's ``site-packages`` directory.
+
+.. _download page: http://www.djangoproject.com/download/
 .. _bsdtar: http://gnuwin32.sourceforge.net/packages/bsdtar.htm
 .. _7-zip: http://www.7-zip.org/
 
@@ -253,8 +295,10 @@ latest bug fixes and improvements, follow these instructions:
 
    .. code-block:: bash
 
-       # Git
+       # Git (requires version 1.6.6 or later)
        git clone https://github.com/django/django.git
+       # or (works with all versions)
+       git clone git://github.com/django/django.git
 
        # Mercurial
        hg clone https://bitbucket.org/django/django
@@ -295,16 +339,19 @@ latest bug fixes and improvements, follow these instructions:
 
    On Windows systems, the same result can be achieved by copying the file
    ``django-trunk/django/bin/django-admin.py`` to somewhere on your system
-   path, for example ``C:\Python24\Scripts``.
+   path, for example ``C:\Python27\Scripts``.
 
-You *don't* have to run ``python setup.py install``, because you've already
-carried out the equivalent actions in steps 3 and 4.
+.. warning::
+
+    You mustn't run ``sudo python setup.py install``, because you've already
+    carried out the equivalent actions in steps 3 and 4. Furthermore, this is
+    known to cause problems when updating to a more recent version of Django.
 
 When you want to update your copy of the Django source code, just run the
 command ``svn update`` from within the ``django-trunk`` directory. When you do
-this, Subversion will automatically download any changes.
+this, Subversion will automatically download any changes. The equivalent
+command for Git is ``git pull``, and for Mercurial ``hg pull --update``.
 
-.. _`download page`: http://www.djangoproject.com/download/
 .. _Subversion: http://subversion.tigris.org/
 .. _Git: http://git-scm.com/
 .. _Mercurial: http://mercurial.selenic.com/

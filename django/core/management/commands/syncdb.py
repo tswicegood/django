@@ -1,5 +1,6 @@
 from optparse import make_option
 import sys
+import traceback
 
 from django.apps import cache
 from django.conf import settings
@@ -23,9 +24,9 @@ class Command(NoArgsCommand):
 
     def handle_noargs(self, **options):
 
-        verbosity = int(options.get('verbosity', 1))
+        verbosity = int(options.get('verbosity'))
         interactive = options.get('interactive')
-        show_traceback = options.get('traceback', False)
+        show_traceback = options.get('traceback')
 
         # Stealth option -- 'load_initial_data' is used by the testing setup
         # process to disable initial fixture loading.
@@ -52,7 +53,7 @@ class Command(NoArgsCommand):
                 if not msg.startswith('No module named') or 'management' not in msg:
                     raise
 
-        db = options.get('database', DEFAULT_DB_ALIAS)
+        db = options.get('database')
         connection = connections[db]
         cursor = connection.cursor()
 
@@ -130,7 +131,6 @@ class Command(NoArgsCommand):
                             sys.stderr.write("Failed to install custom SQL for %s.%s model: %s\n" % \
                                                 (app_name, model._meta.object_name, e))
                             if show_traceback:
-                                import traceback
                                 traceback.print_exc()
                             transaction.rollback_unless_managed(using=db)
                         else:

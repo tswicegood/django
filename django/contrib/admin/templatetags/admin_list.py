@@ -13,7 +13,8 @@ from django.utils.text import capfirst
 from django.utils.translation import ugettext as _
 from django.utils.encoding import smart_unicode, force_unicode
 from django.template import Library
-
+from django.template.loader import get_template
+from django.template.context import Context
 
 register = Library()
 
@@ -83,7 +84,6 @@ def result_headers(cl):
     """
     ordering_field_columns = cl.get_ordering_field_columns()
     for i, field_name in enumerate(cl.list_display):
-        admin_order_field = None
         text, attr = label_for_field(field_name, cl.model,
             model_admin = cl.model_admin,
             return_attr = True
@@ -95,25 +95,31 @@ def result_headers(cl):
             if field_name == 'action_checkbox':
                 yield {
                     "text": text,
-                    "class_attrib": mark_safe(' class="action-checkbox-column"')
+                    "class_attrib": mark_safe(' class="action-checkbox-column"'),
+                    "sortable": False,
                 }
                 continue
 
             admin_order_field = getattr(attr, "admin_order_field", None)
             if not admin_order_field:
                 # Not sortable
-                yield {"text": text}
+                yield {
+                    "text": text,
+                    "sortable": False,
+                }
                 continue
 
         # OK, it is sortable if we got this far
-        th_classes = []
+        th_classes = ['sortable']
         order_type = ''
         new_order_type = 'asc'
-        sort_pos = 0
+        sort_priority = 0
+        sorted = False
         # Is it currently being sorted on?
         if i in ordering_field_columns:
+            sorted = True
             order_type = ordering_field_columns.get(i).lower()
-            sort_pos = ordering_field_columns.keys().index(i) + 1
+            sort_priority = ordering_field_columns.keys().index(i) + 1
             th_classes.append('sorted %sending' % order_type)
             new_order_type = {'asc': 'desc', 'desc': 'asc'}[order_type]
 
@@ -144,8 +150,9 @@ def result_headers(cl):
         yield {
             "text": text,
             "sortable": True,
+            "sorted": sorted,
             "ascending": order_type == "asc",
-            "sort_pos": sort_pos,
+            "sort_priority": sort_priority,
             "url_primary": cl.get_query_string({ORDER_VAR: '.'.join(o_list_primary)}),
             "url_remove": cl.get_query_string({ORDER_VAR: '.'.join(o_list_remove)}),
             "url_toggle": cl.get_query_string({ORDER_VAR: '.'.join(o_list_toggle)}),
@@ -260,13 +267,14 @@ def result_list(cl):
     Displays the headers and data list together
     """
     headers = list(result_headers(cl))
+    num_sorted_fields = 0
     for h in headers:
-        # Sorting in templates depends on sort_pos attribute
-        h.setdefault('sort_pos', 0)
+        if h['sortable'] and h['sorted']:
+            num_sorted_fields += 1
     return {'cl': cl,
             'result_hidden_fields': list(result_hidden_fields(cl)),
             'result_headers': headers,
-            'reset_sorting_url': cl.get_query_string(remove=[ORDER_VAR]),
+            'num_sorted_fields': num_sorted_fields,
             'results': list(results(cl))}
 
 @register.inclusion_tag('admin/date_hierarchy.html')
@@ -353,9 +361,14 @@ def search_form(cl):
         'search_var': SEARCH_VAR
     }
 
-@register.inclusion_tag('admin/filter.html')
+@register.simple_tag
 def admin_list_filter(cl, spec):
-    return {'title': spec.title, 'choices' : list(spec.choices(cl))}
+    tpl = get_template(spec.template)
+    return tpl.render(Context({
+        'title': spec.title,
+        'choices' : list(spec.choices(cl)),
+        'spec': spec,
+    }))
 
 @register.inclusion_tag('admin/actions.html', takes_context=True)
 def admin_actions(context):

@@ -3,6 +3,8 @@ import hashlib
 import os
 import posixpath
 import re
+from urllib import unquote
+from urlparse import urlsplit, urlunsplit, urldefrag
 
 from django.conf import settings
 from django.core.cache import (get_cache, InvalidCacheBackendError,
@@ -10,10 +12,10 @@ from django.core.cache import (get_cache, InvalidCacheBackendError,
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, get_storage_class
-from django.utils.encoding import force_unicode
+from django.utils.datastructures import SortedDict
+from django.utils.encoding import force_unicode, smart_str
 from django.utils.functional import LazyObject
 from django.utils.importlib import import_module
-from django.utils.datastructures import SortedDict
 
 from django.contrib.staticfiles.utils import check_settings, matches_patterns
 
@@ -64,23 +66,33 @@ class CachedFilesMixin(object):
                 self._patterns.setdefault(extension, []).append(compiled)
 
     def hashed_name(self, name, content=None):
+        parsed_name = urlsplit(unquote(name))
+        clean_name = parsed_name.path
         if content is None:
-            if not self.exists(name):
+            if not self.exists(clean_name):
                 raise ValueError("The file '%s' could not be found with %r." %
-                                 (name, self))
+                                 (clean_name, self))
             try:
-                content = self.open(name)
+                content = self.open(clean_name)
             except IOError:
-                # Handle directory paths
+                # Handle directory paths and fragments
                 return name
-        path, filename = os.path.split(name)
+        path, filename = os.path.split(clean_name)
         root, ext = os.path.splitext(filename)
         # Get the MD5 hash of the file
         md5 = hashlib.md5()
         for chunk in content.chunks():
             md5.update(chunk)
         md5sum = md5.hexdigest()[:12]
-        return os.path.join(path, u"%s.%s%s" % (root, md5sum, ext))
+        hashed_name = os.path.join(path, u"%s.%s%s" %
+                                   (root, md5sum, ext))
+        unparsed_name = list(parsed_name)
+        unparsed_name[2] = hashed_name
+        # Special casing for a @font-face hack, like url(myfont.eot?#iefix")
+        # http://www.fontspring.com/blog/the-new-bulletproof-font-face-syntax
+        if '?#' in name and not unparsed_name[3]:
+            unparsed_name[2] += '?'
+        return urlunsplit(unparsed_name)
 
     def cache_key(self, name):
         return u'staticfiles:cache:%s' % name
@@ -90,12 +102,34 @@ class CachedFilesMixin(object):
         Returns the real URL in DEBUG mode.
         """
         if settings.DEBUG and not force:
-            return super(CachedFilesMixin, self).url(name)
-        cache_key = self.cache_key(name)
-        hashed_name = self.cache.get(cache_key)
-        if hashed_name is None:
-            hashed_name = self.hashed_name(name)
-        return super(CachedFilesMixin, self).url(hashed_name)
+            hashed_name, fragment = name, ''
+        else:
+            clean_name, fragment = urldefrag(name)
+            if urlsplit(clean_name).path.endswith('/'):  # don't hash paths
+                hashed_name = name
+            else:
+                cache_key = self.cache_key(name)
+                hashed_name = self.cache.get(cache_key)
+                if hashed_name is None:
+                    hashed_name = self.hashed_name(clean_name).replace('\\', '/')
+                    # set the cache if there was a miss
+                    # (e.g. if cache server goes down)
+                    self.cache.set(cache_key, hashed_name)
+
+        final_url = super(CachedFilesMixin, self).url(hashed_name)
+
+        # Special casing for a @font-face hack, like url(myfont.eot?#iefix")
+        # http://www.fontspring.com/blog/the-new-bulletproof-font-face-syntax
+        query_fragment = '?#' in name  # [sic!]
+        if fragment or query_fragment:
+            urlparts = list(urlsplit(final_url))
+            if fragment and not urlparts[4]:
+                urlparts[4] = fragment
+            if query_fragment and not urlparts[3]:
+                urlparts[2] += '?'
+            final_url = urlunsplit(urlparts)
+
+        return unquote(final_url)
 
     def url_converter(self, name):
         """
@@ -108,69 +142,104 @@ class CachedFilesMixin(object):
             of the storage.
             """
             matched, url = matchobj.groups()
-            # Completely ignore http(s) prefixed URLs
-            if url.startswith(('http', 'https')):
+            # Completely ignore http(s) prefixed URLs,
+            # fragments and data-uri URLs
+            if url.startswith(('#', 'http:', 'https:', 'data:')):
                 return matched
-            name_parts = name.split('/')
+            name_parts = name.split(os.sep)
             # Using posix normpath here to remove duplicates
-            result = url_parts = posixpath.normpath(url).split('/')
-            level = url.count('..')
-            if level:
-                result = name_parts[:-level - 1] + url_parts[level:]
-            elif name_parts[:-1]:
-                result = name_parts[:-1] + url_parts[-1:]
-            joined_result = '/'.join(result)
-            hashed_url = self.url(joined_result, force=True)
+            url = posixpath.normpath(url)
+            url_parts = url.split('/')
+            parent_level, sub_level = url.count('..'), url.count('/')
+            if url.startswith('/'):
+                sub_level -= 1
+                url_parts = url_parts[1:]
+            if parent_level or not url.startswith('/'):
+                start, end = parent_level + 1, parent_level
+            else:
+                if sub_level:
+                    if sub_level == 1:
+                        parent_level -= 1
+                    start, end = parent_level, 1
+                else:
+                    start, end = 1, sub_level - 1
+            joined_result = '/'.join(name_parts[:-start] + url_parts[end:])
+            hashed_url = self.url(unquote(joined_result), force=True)
+
             # Return the hashed and normalized version to the file
-            return 'url("%s")' % hashed_url
+            return 'url("%s")' % unquote(hashed_url)
         return converter
 
     def post_process(self, paths, dry_run=False, **options):
         """
         Post process the given list of files (called from collectstatic).
+
+        Processing is actually two separate operations:
+
+        1. renaming files to include a hash of their content for cache-busting,
+           and copying those files to the target storage.
+        2. adjusting files which contain references to other files so they
+           refer to the cache-busting filenames.
+
+        If either of these are performed on a file, then that file is considered
+        post-processed.
         """
-        processed_files = []
         # don't even dare to process the files if we're in dry run mode
         if dry_run:
-            return processed_files
+            return
 
         # delete cache of all handled paths
         self.cache.delete_many([self.cache_key(path) for path in paths])
 
-        # only try processing the files we have patterns for
+        # build a list of adjustable files
         matches = lambda path: matches_patterns(path, self._patterns.keys())
-        processing_paths = [path for path in paths if matches(path)]
+        adjustable_paths = [path for path in paths if matches(path)]
 
         # then sort the files by the directory level
         path_level = lambda name: len(name.split(os.sep))
-        for name in sorted(paths, key=path_level, reverse=True):
+        for name in sorted(paths.keys(), key=path_level, reverse=True):
 
-            # first get a hashed name for the given file
-            hashed_name = self.hashed_name(name)
+            # use the original, local file, not the copied-but-unprocessed
+            # file, which might be somewhere far away, like S3
+            storage, path = paths[name]
+            with storage.open(path) as original_file:
 
-            with self.open(name) as original_file:
-                # then get the original's file content
-                content = original_file.read()
+                # generate the hash with the original content, even for
+                # adjustable files.
+                hashed_name = self.hashed_name(name, original_file)
 
-                # to apply each replacement pattern on the content
-                if name in processing_paths:
+                # then get the original's file content..
+                if hasattr(original_file, 'seek'):
+                    original_file.seek(0)
+
+                hashed_file_exists = self.exists(hashed_name)
+                processed = False
+
+                # ..to apply each replacement pattern to the content
+                if name in adjustable_paths:
+                    content = original_file.read()
                     converter = self.url_converter(name)
                     for patterns in self._patterns.values():
                         for pattern in patterns:
                             content = pattern.sub(converter, content)
-
-                # then save the processed result
-                if self.exists(hashed_name):
-                    self.delete(hashed_name)
-
-                saved_name = self._save(hashed_name, ContentFile(content))
-                hashed_name = force_unicode(saved_name.replace('\\', '/'))
-                processed_files.append(hashed_name)
+                    if hashed_file_exists:
+                        self.delete(hashed_name)
+                    # then save the processed result
+                    content_file = ContentFile(smart_str(content))
+                    saved_name = self._save(hashed_name, content_file)
+                    hashed_name = force_unicode(saved_name.replace('\\', '/'))
+                    processed = True
+                else:
+                    # or handle the case in which neither processing nor
+                    # a change to the original file happened
+                    if not hashed_file_exists:
+                        processed = True
+                        saved_name = self._save(hashed_name, original_file)
+                        hashed_name = force_unicode(saved_name.replace('\\', '/'))
 
                 # and then set the cache accordingly
                 self.cache.set(self.cache_key(name), hashed_name)
-
-        return processed_files
+                yield name, hashed_name, processed
 
 
 class CachedStaticFilesStorage(CachedFilesMixin, StaticFilesStorage):

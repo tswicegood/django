@@ -1,7 +1,8 @@
 from django.db import transaction
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPasswordChangeForm
+from django.contrib.auth.forms import (UserCreationForm, UserChangeForm,
+    AdminPasswordChangeForm)
 from django.contrib.auth.models import User, Group
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -10,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.utils.html import escape
 from django.utils.decorators import method_decorator
+from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext, ugettext_lazy as _
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
@@ -27,7 +29,8 @@ class GroupAdmin(admin.ModelAdmin):
             # Avoid a major performance hit resolving permission names which
             # triggers a content_type load:
             kwargs['queryset'] = qs.select_related('content_type')
-        return super(GroupAdmin, self).formfield_for_manytomany(db_field, request=request, **kwargs)
+        return super(GroupAdmin, self).formfield_for_manytomany(
+            db_field, request=request, **kwargs)
 
 
 class UserAdmin(admin.ModelAdmin):
@@ -36,9 +39,9 @@ class UserAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),
-        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser', 'user_permissions')}),
+        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser',
+                                       'groups', 'user_permissions')}),
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
-        (_('Groups'), {'fields': ('groups',)}),
     )
     add_fieldsets = (
         (None, {
@@ -74,9 +77,10 @@ class UserAdmin(admin.ModelAdmin):
         return super(UserAdmin, self).get_form(request, obj, **defaults)
 
     def get_urls(self):
-        from django.conf.urls.defaults import patterns
+        from django.conf.urls import patterns
         return patterns('',
-            (r'^(\d+)/password/$', self.admin_site.admin_view(self.user_change_password))
+            (r'^(\d+)/password/$',
+             self.admin_site.admin_view(self.user_change_password))
         ) + super(UserAdmin, self).get_urls()
 
     @sensitive_post_parameters()
@@ -93,7 +97,11 @@ class UserAdmin(admin.ModelAdmin):
             if self.has_add_permission(request) and settings.DEBUG:
                 # Raise Http404 in debug mode so that the user gets a helpful
                 # error message.
-                raise Http404('Your user does not have the "Change user" permission. In order to add users, Django requires that your user account have both the "Add user" and "Change user" permissions set.')
+                raise Http404(
+                    'Your user does not have the "Change user" permission. In '
+                    'order to add users, Django requires that your user '
+                    'account have both the "Add user" and "Change user" '
+                    'permissions set.')
             raise PermissionDenied
         if extra_context is None:
             extra_context = {}
@@ -102,17 +110,18 @@ class UserAdmin(admin.ModelAdmin):
             'username_help_text': self.model._meta.get_field('username').help_text,
         }
         extra_context.update(defaults)
-        return super(UserAdmin, self).add_view(request, form_url, extra_context)
+        return super(UserAdmin, self).add_view(request, form_url,
+                                               extra_context)
 
     @sensitive_post_parameters()
-    def user_change_password(self, request, id):
+    def user_change_password(self, request, id, form_url=''):
         if not self.has_change_permission(request):
             raise PermissionDenied
-        user = get_object_or_404(self.model, pk=id)
+        user = get_object_or_404(self.queryset(request), pk=id)
         if request.method == 'POST':
             form = self.change_password_form(user, request.POST)
             if form.is_valid():
-                new_user = form.save()
+                form.save()
                 msg = ugettext('Password changed successfully.')
                 messages.success(request, msg)
                 return HttpResponseRedirect('..')
@@ -125,6 +134,7 @@ class UserAdmin(admin.ModelAdmin):
         context = {
             'title': _('Change password: %s') % escape(user.username),
             'adminForm': adminForm,
+            'form_url': mark_safe(form_url),
             'form': form,
             'is_popup': '_popup' in request.REQUEST,
             'add': True,
@@ -155,7 +165,8 @@ class UserAdmin(admin.ModelAdmin):
         # * We are adding a user in a popup
         if '_addanother' not in request.POST and '_popup' not in request.POST:
             request.POST['_continue'] = 1
-        return super(UserAdmin, self).response_add(request, obj, post_url_continue)
+        return super(UserAdmin, self).response_add(request, obj,
+                                                   post_url_continue)
 
 admin.site.register(Group, GroupAdmin)
 admin.site.register(User, UserAdmin)

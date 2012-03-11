@@ -211,7 +211,7 @@ class FileField(Field):
     # The descriptor to use for accessing the attribute off of the class.
     descriptor_class = FileDescriptor
 
-    description = _("File path")
+    description = _("File")
 
     def __init__(self, verbose_name=None, name=None, upload_to='', storage=None, **kwargs):
         for arg in ('primary_key', 'unique'):
@@ -318,11 +318,12 @@ class ImageFieldFile(ImageFile, FieldFile):
 class ImageField(FileField):
     attr_class = ImageFieldFile
     descriptor_class = ImageFileDescriptor
-    description = _("File path")
+    description = _("Image")
 
-    def __init__(self, verbose_name=None, name=None, width_field=None, height_field=None, **kwargs):
+    def __init__(self, verbose_name=None, name=None, width_field=None,
+            height_field=None, **kwargs):
         self.width_field, self.height_field = width_field, height_field
-        FileField.__init__(self, verbose_name, name, **kwargs)
+        super(ImageField, self).__init__(verbose_name, name, **kwargs)
 
     def contribute_to_class(self, cls, name):
         super(ImageField, self).contribute_to_class(cls, name)

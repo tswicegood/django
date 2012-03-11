@@ -16,10 +16,11 @@ from django.utils.log import getLogger
 logger = getLogger('django.request')
 
 
-# See http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
+# See http://www.iana.org/assignments/http-status-codes
 STATUS_CODE_TEXT = {
     100: 'CONTINUE',
     101: 'SWITCHING PROTOCOLS',
+    102: 'PROCESSING',
     200: 'OK',
     201: 'CREATED',
     202: 'ACCEPTED',
@@ -27,6 +28,9 @@ STATUS_CODE_TEXT = {
     204: 'NO CONTENT',
     205: 'RESET CONTENT',
     206: 'PARTIAL CONTENT',
+    207: 'MULTI-STATUS',
+    208: 'ALREADY REPORTED',
+    226: 'IM USED',
     300: 'MULTIPLE CHOICES',
     301: 'MOVED PERMANENTLY',
     302: 'FOUND',
@@ -53,12 +57,20 @@ STATUS_CODE_TEXT = {
     415: 'UNSUPPORTED MEDIA TYPE',
     416: 'REQUESTED RANGE NOT SATISFIABLE',
     417: 'EXPECTATION FAILED',
+    422: 'UNPROCESSABLE ENTITY',
+    423: 'LOCKED',
+    424: 'FAILED DEPENDENCY',
+    426: 'UPGRADE REQUIRED',
     500: 'INTERNAL SERVER ERROR',
     501: 'NOT IMPLEMENTED',
     502: 'BAD GATEWAY',
     503: 'SERVICE UNAVAILABLE',
     504: 'GATEWAY TIMEOUT',
     505: 'HTTP VERSION NOT SUPPORTED',
+    506: 'VARIANT ALSO NEGOTIATES',
+    507: 'INSUFFICIENT STORAGE',
+    508: 'LOOP DETECTED',
+    510: 'NOT EXTENDED',
 }
 
 class LimitedStream(object):
@@ -112,6 +124,7 @@ class LimitedStream(object):
         self.buffer = sio.read()
         return line
 
+
 class WSGIRequest(http.HttpRequest):
     def __init__(self, environ):
         script_name = base.get_script_name(environ)
@@ -123,7 +136,7 @@ class WSGIRequest(http.HttpRequest):
             # the path like this, but should be harmless.
             #
             # (The comparison of path_info to script_name is to work around an
-            # apparent bug in flup 1.0.1. Se Django ticket #8490).
+            # apparent bug in flup 1.0.1. See Django ticket #8490).
             path_info = u'/'
         self.environ = environ
         self.path_info = path_info
@@ -145,9 +158,8 @@ class WSGIRequest(http.HttpRequest):
         # Rather than crash if this doesn't happen, we encode defensively.
         return '%s%s' % (self.path, self.environ.get('QUERY_STRING', '') and ('?' + iri_to_uri(self.environ.get('QUERY_STRING', ''))) or '')
 
-    def is_secure(self):
-        return 'wsgi.url_scheme' in self.environ \
-            and self.environ['wsgi.url_scheme'] == 'https'
+    def _is_secure(self):
+        return 'wsgi.url_scheme' in self.environ and self.environ['wsgi.url_scheme'] == 'https'
 
     def _get_request(self):
         if not hasattr(self, '_request'):
@@ -190,13 +202,12 @@ class WSGIRequest(http.HttpRequest):
     FILES = property(_get_files)
     REQUEST = property(_get_request)
 
+
 class WSGIHandler(base.BaseHandler):
     initLock = Lock()
     request_class = WSGIRequest
 
     def __call__(self, environ, start_response):
-        from django.conf import settings
-
         # Set up middleware if needed. We couldn't do this earlier, because
         # settings weren't available.
         if self._request_middleware is None:
@@ -241,4 +252,3 @@ class WSGIHandler(base.BaseHandler):
             response_headers.append(('Set-Cookie', str(c.output(header=''))))
         start_response(status, response_headers)
         return response
-

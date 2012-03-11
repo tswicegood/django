@@ -8,10 +8,10 @@ django.contrib.markup
 Django provides template filters that implement the following markup
 languages:
 
-    * ``textile`` -- implements `Textile`_ -- requires `PyTextile`_
-    * ``markdown`` -- implements `Markdown`_ -- requires `Python-markdown`_
-    * ``restructuredtext`` -- implements `reST (reStructured Text)`_
-      -- requires `doc-utils`_
+* ``textile`` -- implements `Textile`_ -- requires `PyTextile`_
+* ``markdown`` -- implements `Markdown`_ -- requires `Python-markdown`_
+* ``restructuredtext`` -- implements `reST (reStructured Text)`_
+  -- requires `doc-utils`_
 
 In each case, the filter expects formatted markup as a string and
 returns a string representing the marked-up text. For example, the
@@ -35,7 +35,7 @@ For more documentation, read the source code in
 .. _Markdown: http://en.wikipedia.org/wiki/Markdown
 .. _reST (reStructured Text): http://en.wikipedia.org/wiki/ReStructuredText
 .. _PyTextile: http://loopcore.com/python-textile/
-.. _Python-markdown: http://www.freewisdom.org/projects/python-markdown
+.. _Python-markdown: http://pypi.python.org/pypi/Markdown
 .. _doc-utils: http://docutils.sf.net/
 
 reStructured Text

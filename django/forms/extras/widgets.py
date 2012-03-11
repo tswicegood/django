@@ -101,7 +101,6 @@ class SelectDateWidget(Widget):
             return '%s_%s' % (id_, first_select)
         else:
             return '%s_month' % id_
-    id_for_label = classmethod(id_for_label)
 
     def value_from_datadict(self, data, files, name):
         y = data.get(self.year_field % name)
@@ -134,3 +133,11 @@ class SelectDateWidget(Widget):
         s = Select(choices=choices)
         select_html = s.render(field % name, val, local_attrs)
         return select_html
+
+    def _has_changed(self, initial, data):
+        try:
+            input_format = get_format('DATE_INPUT_FORMATS')[0]
+            data = datetime_safe.datetime.strptime(data, input_format).date()
+        except (TypeError, ValueError):
+            pass
+        return super(SelectDateWidget, self)._has_changed(initial, data)

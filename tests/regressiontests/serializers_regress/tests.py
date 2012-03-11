@@ -8,7 +8,7 @@ forward, backwards and self references.
 """
 # This is necessary in Python 2.5 to enable the with statement, in 2.6
 # and up it is no longer necessary.
-from __future__ import with_statement
+from __future__ import with_statement, absolute_import
 
 import datetime
 import decimal
@@ -17,13 +17,32 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 from django.core import serializers
 from django.core.serializers import SerializerDoesNotExist
-from django.db import connection
+from django.core.serializers.base import DeserializationError
+from django.db import connection, models
 from django.test import TestCase
 from django.utils.functional import curry
+from django.utils.unittest import skipUnless
 
-from models import *
+from .models import (BooleanData, CharData, DateData, DateTimeData, EmailData,
+    FileData, FilePathData, DecimalData, FloatData, IntegerData, IPAddressData,
+    GenericIPAddressData, NullBooleanData, PhoneData, PositiveIntegerData,
+    PositiveSmallIntegerData, SlugData, SmallData, TextData, TimeData,
+    USStateData, GenericData, Anchor, UniqueAnchor, FKData, M2MData, O2OData,
+    FKSelfData, M2MSelfData, FKDataToField, FKDataToO2O, M2MIntermediateData,
+    Intermediate, BooleanPKData, CharPKData, EmailPKData, FilePathPKData,
+    DecimalPKData, FloatPKData, IntegerPKData, IPAddressPKData,
+    GenericIPAddressPKData, PhonePKData, PositiveIntegerPKData,
+    PositiveSmallIntegerPKData, SlugPKData, SmallPKData, USStatePKData,
+    AutoNowDateTimeData, ModifyingSaveData, InheritAbstractModel, BaseModel,
+    ExplicitInheritBaseModel, InheritBaseModel, ProxyBaseModel,
+    ProxyProxyBaseModel, BigIntegerData, LengthModel, Tag, ComplexModel)
 
 # A set of functions that can be used to recreate
 # test data objects of various kinds.
@@ -85,7 +104,7 @@ def pk_create(pk, klass, data):
 def inherited_create(pk, klass, data):
     instance = klass(id=pk,**data)
     # This isn't a raw save because:
-    #  1) we're testing inheritance, not field behaviour, so none
+    #  1) we're testing inheritance, not field behavior, so none
     #     of the field values need to be protected.
     #  2) saving the child class and having the parent created
     #     automatically is easier than manually creating both.
@@ -377,6 +396,29 @@ class SerializerTests(TestCase):
     def test_get_unkown_deserializer(self):
         with self.assertRaises(SerializerDoesNotExist):
             serializers.get_deserializer("nonsense")
+
+    def test_json_deserializer_exception(self):
+        with self.assertRaises(DeserializationError):
+            for obj in serializers.deserialize("json", """[{"pk":1}"""):
+                pass
+
+    @skipUnless(yaml, "PyYAML not installed")
+    def test_yaml_deserializer_exception(self):
+        with self.assertRaises(DeserializationError):
+            for obj in serializers.deserialize("yaml", "{"):
+                pass
+
+    def test_serialize_proxy_model(self):
+        BaseModel.objects.create(parent_data=1)
+        base_objects = BaseModel.objects.all()
+        proxy_objects = ProxyBaseModel.objects.all()
+        proxy_proxy_objects = ProxyProxyBaseModel.objects.all()
+        base_data = serializers.serialize("json", base_objects)
+        proxy_data = serializers.serialize("json", proxy_objects)
+        proxy_proxy_data = serializers.serialize("json", proxy_proxy_objects)
+        self.assertEqual(base_data, proxy_data.replace('proxy', ''))
+        self.assertEqual(base_data, proxy_proxy_data.replace('proxy', ''))
+
 
 def serializerTest(format, self):
 
